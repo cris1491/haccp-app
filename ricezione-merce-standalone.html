@@ -191,8 +191,8 @@ select{width:100%;min-height:52px;padding:0 12px;border:1.5px solid var(--line);
 
         <div class="field">
           <label class="lbl" for="supplier">Fornitore</label>
-          <input id="supplier" type="text" list="suppliers" autocomplete="off" autocapitalize="words">
-          <datalist id="suppliers"></datalist>
+          <select id="supplier"></select>
+          <input id="supplierNew" type="text" autocomplete="off" autocapitalize="words" placeholder="Scrivi il nome del nuovo fornitore" aria-label="Nome del nuovo fornitore" hidden>
         </div>
 
         <div class="row2">
@@ -410,16 +410,20 @@ function openCompose(){document.body.classList.add('composing');}
 function closeCompose(){document.body.classList.remove('composing');}
 function resetForm(){
   S.draft.forEach(function(p){URL.revokeObjectURL(p.url);});S.draft=[];renderThumbs();
-  ['supplier','ddt','temp','lot','note'].forEach(function(id){$('#'+id).value='';});
+  ['supplierNew','ddt','temp','lot','note'].forEach(function(id){$('#'+id).value='';});
+  $('#supplier').value='';toggleNewSupplier(false);
   document.querySelector('input[name=esito][value=ok]').checked=true;hideErr();
 }
 function onSubmit(e){
   e.preventDefault();hideErr();
-  var supplier=$('#supplier').value.trim(),note=$('#note').value.trim();
+  var sv=$('#supplier').value,isNew=(sv==='__new__');
+  var supplier=isNew?$('#supplierNew').value.trim():sv,note=$('#note').value.trim();
   var esito=document.querySelector('input[name=esito]:checked').value;
   var t=parseTemp($('#temp').value);
   if(!S.draft.length){showErr('Fotografa il DDT prima di salvare.');return;}
-  if(!supplier){showErr('Scrivi il nome del fornitore.');$('#supplier').focus();return;}
+  if(!supplier){showErr(isNew?'Scrivi il nome del nuovo fornitore.':'Scegli il fornitore dalla lista.');(isNew?$('#supplierNew'):$('#supplier')).focus();return;}
+  var same=S.rows.find(function(r){return r.supplier.toLowerCase()===supplier.toLowerCase();});
+  if(same)supplier=same.supplier;
   if(!t.ok){showErr('La temperatura non è valida. Scrivi un numero, per esempio 3,5 oppure -18.');$('#temp').focus();return;}
   if(esito==='nc'&&!note){showErr('Se la merce non è conforme, scrivi nelle note qual è il problema.');$('#note').focus();return;}
   var rec={id:uid(),ts:Date.now(),supplier:supplier,ddt:$('#ddt').value.trim(),lot:$('#lot').value.trim(),temp:t.val,esito:esito,note:note,
@@ -458,8 +462,19 @@ function renderList(){
 }
 function renderSuppliers(){
   var cnt={};S.rows.forEach(function(r){cnt[r.supplier]=(cnt[r.supplier]||0)+1;});
-  var dl=$('#suppliers');dl.textContent='';
-  Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a];}).forEach(function(s){dl.append(h('option',{value:s}));});
+  var sel=$('#supplier'),prev=sel.value,names=Object.keys(cnt).sort(function(a,b){return a.localeCompare(b,'it');});
+  sel.textContent='';
+  sel.append(h('option',{value:'',text:'Scegli fornitore…'}));
+  names.forEach(function(s){sel.append(h('option',{value:s,text:s}));});
+  sel.append(h('option',{value:'__new__',text:'➕ Nuovo fornitore…'}));
+  var keep=Array.prototype.some.call(sel.options,function(o){return o.value===prev;});
+  sel.value=(keep&&(prev||names.length))?prev:(names.length?'':'__new__');
+  toggleNewSupplier(false);
+}
+function toggleNewSupplier(focus){
+  var isNew=$('#supplier').value==='__new__',inp=$('#supplierNew');
+  inp.hidden=!isNew;
+  if(isNew&&focus)inp.focus();
 }
 function renderNotices(){
   var box=$('#notices');box.textContent='';
@@ -649,6 +664,7 @@ function bind(){
   $('#pickGal').addEventListener('click',function(){$('#gal').click();});
   $('#signBtn').addEventListener('click',function(){var t=$('#temp'),v=t.value.trim();t.value=(v.charAt(0)==='-'||v.charAt(0)==='−')?v.slice(1):'-'+v;t.focus();});
   $('#form').addEventListener('submit',onSubmit);
+  $('#supplier').addEventListener('change',function(){toggleNewSupplier(true);});
   $('#period').addEventListener('change',updateExportInfo);
   $('#btnPdf').addEventListener('click',function(){doExport('pdf');});
   $('#btnCsv').addEventListener('click',function(){doExport('csv');});
