@@ -139,6 +139,36 @@ select{width:100%;min-height:52px;padding:0 12px;border:1.5px solid var(--line);
 
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:min(92vw,520px);background:var(--fg);color:var(--bg);padding:12px 16px;border-radius:10px;font-weight:500;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.3)}
 
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;margin:0 0 6px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;min-height:48px;padding:0 16px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);font-family:var(--display);font-weight:700;font-size:1.1rem;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;cursor:pointer}
+.tab.soon{color:var(--muted)}
+.tab[aria-current=page],.tab.soon[aria-current=page]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.page{max-width:680px}
+.addrow{display:flex;gap:10px;margin:12px 0}
+.addrow input{flex:1;min-width:0}
+.addcol{display:flex;flex-direction:column;gap:10px;margin:12px 0}
+.addbtn{min-height:52px;padding:0 20px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-fg);font-family:var(--display);font-weight:700;font-size:1.2rem;text-transform:uppercase;letter-spacing:.05em;cursor:pointer}
+.pitem{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);margin-bottom:8px}
+.item-main{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.item-name{font-weight:600;font-size:1.05rem;overflow-wrap:anywhere}
+.item-sub{color:var(--muted);font-size:.88rem;overflow-wrap:anywhere}
+.item-actions{display:flex;gap:8px;flex:0 0 auto}
+.small-btn{min-height:44px;padding:0 14px;border-radius:8px;border:1.5px solid var(--bad);background:transparent;color:var(--bad);font-weight:600;cursor:pointer}
+.small-btn.plain{border-color:var(--fg);color:var(--fg)}
+.small-btn.solid{background:var(--bad);color:var(--surface)}
+input[type=date]{display:block;width:100%;min-height:52px;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:1rem}
+.field[data-flag=check] .lbl::after{content:' · da verificare';color:var(--accent)}
+.field[data-flag=missing] .lbl::after{content:' · non letto, scrivilo tu';color:var(--bad)}
+.field[data-flag=check] input,.field[data-flag=check] select{border-color:var(--accent);background:var(--accent-soft)}
+.field[data-flag=missing] input{border-color:var(--bad)}
+.lbtns{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.lotrow{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.lotrow .thumbbtn{flex:0 0 56px;height:56px;padding:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface-2);cursor:pointer}
+.lotrow img{width:100%;height:100%;object-fit:cover;display:block}
+.lotinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.overlay.shot{align-items:center;padding:12px;z-index:50}
+.shot img{max-width:100%;max-height:100%;border-radius:8px}
 @media (min-width:760px){
   .fab,.sheet-close{display:none}
   .layout{grid-template-columns:minmax(330px,400px) 1fr;gap:28px}
@@ -162,15 +192,17 @@ select{width:100%;min-height:52px;padding:0 12px;border:1.5px solid var(--line);
 <div class="app">
   <header class="top">
     <div>
-      <h1>Ricezione merce</h1>
+      <h1>HACCP</h1>
       <p>Registro HACCP. I dati restano salvati su questo dispositivo.</p>
     </div>
     <button class="ghost" id="btnExport" type="button">Esporta</button>
   </header>
 
+  <nav class="tabs" id="tabs" aria-label="Sezioni"></nav>
+
   <div id="notices"></div>
 
-  <main class="layout">
+  <main class="layout" id="sec-ricezione" data-page>
     <section class="compose" id="compose" aria-label="Nuova ricezione">
       <div class="compose-head">
         <h2>Nuova ricezione</h2>
@@ -251,6 +283,50 @@ select{width:100%;min-height:52px;padding:0 12px;border:1.5px solid var(--line);
       <div id="list"></div>
     </section>
   </main>
+
+  <section class="page" id="sec-fornitori" data-page hidden aria-label="Fornitori">
+    <h2 class="list-title">Fornitori<span class="mono" id="supCount"></span></h2>
+    <form class="addrow" id="supForm" novalidate>
+      <input id="supName" type="text" autocomplete="off" autocapitalize="words" placeholder="Nome del fornitore" aria-label="Nome del fornitore">
+      <button class="addbtn" type="submit">Aggiungi</button>
+    </form>
+    <p class="err" id="supErr" role="alert" hidden></p>
+    <div id="supList"></div>
+  </section>
+
+  <section class="page" id="sec-ricette" data-page hidden aria-label="Ricette">
+    <h2 class="list-title">Ricette<span class="mono" id="ricCount"></span></h2>
+    <form class="addcol" id="ricForm" novalidate>
+      <input id="ricName" type="text" autocomplete="off" autocapitalize="sentences" placeholder="Nome della ricetta" aria-label="Nome della ricetta">
+      <textarea id="ricIng" rows="4" placeholder="Ingredienti, uno per riga" aria-label="Ingredienti, uno per riga"></textarea>
+      <button class="addbtn" type="submit">Aggiungi ricetta</button>
+    </form>
+    <p class="err" id="ricErr" role="alert" hidden></p>
+    <div id="ricList"></div>
+  </section>
+
+  <section class="page" id="sec-ingredienti" data-page hidden aria-label="Ingredienti">
+    <h2 class="list-title">Ingredienti<span class="mono" id="ingCount"></span></h2>
+    <p class="info">Fotografa l'etichetta di un prodotto: l'app legge codice a barre, lotto e scadenza. Tu controlli e confermi con un tocco.</p>
+    <div class="lbtns">
+      <label class="shoot" id="labShoot" for="labCam">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <span>Fotografa etichetta</span>
+      </label>
+      <input class="sr" id="labCam" type="file" accept="image/*" capture="environment">
+      <input class="sr" id="labGal" type="file" accept="image/*">
+      <button type="button" class="link" id="labPickGal">Scegli dalla galleria</button>
+      <button type="button" class="link" id="labManual">Inserisci a mano, senza foto</button>
+    </div>
+    <p class="hint">Consiglio: foto ravvicinata, ben illuminata, con il testo dritto.</p>
+    <div id="ingList"></div>
+    <button type="button" class="ghost" id="btnLotExport">Esporta lotti (CSV)</button>
+  </section>
+
+  <section class="page" id="sec-soon" data-page hidden aria-label="Sezione in preparazione">
+    <h2 class="list-title" id="soonTitle"></h2>
+    <p class="empty-s">Questa sezione è in preparazione. Per ora sono attive Ricezione merce, Fornitori e Ricette.</p>
+  </section>
 </div>
 
 <button class="fab" id="fab" type="button">
@@ -286,6 +362,54 @@ select{width:100%;min-height:52px;padding:0 12px;border:1.5px solid var(--line);
   </div>
 </div>
 
+<div class="overlay" id="labSheet" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="labTitle">
+    <h2 id="labTitle">Etichetta del prodotto</h2>
+    <p class="sub" id="labStatus" role="status" aria-live="polite"></p>
+    <div class="thumbs" id="labThumb"></div>
+    <form id="labForm" novalidate>
+      <div class="field">
+        <label class="lbl" for="labProd">Prodotto</label>
+        <select id="labProd"></select>
+        <input id="labProdNew" type="text" autocomplete="off" autocapitalize="sentences" placeholder="Nome del nuovo prodotto" aria-label="Nome del nuovo prodotto" hidden>
+      </div>
+      <div class="field">
+        <label class="lbl" for="labSup">Fornitore (facoltativo)</label>
+        <select id="labSup"></select>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label class="lbl" for="labLot">Lotto</label>
+          <input id="labLot" type="text" autocomplete="off" autocapitalize="characters">
+        </div>
+        <div class="field">
+          <label class="lbl" for="labScad">Scadenza</label>
+          <input id="labScad" type="date">
+        </div>
+      </div>
+      <div class="field">
+        <label class="lbl" for="labCode">Codice a barre (se c'è)</label>
+        <input id="labCode" type="text" inputmode="numeric" autocomplete="off">
+      </div>
+      <p class="err" id="labErr" role="alert" hidden></p>
+      <div class="actions">
+        <button type="button" id="labCancel">Annulla</button>
+        <button type="submit" class="solid" id="labSave">Conferma e salva</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="overlay" id="ingSheet" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="ingTitle">
+    <h2 id="ingTitle"></h2>
+    <p class="sub" id="ingSub"></p>
+    <dl class="kv" id="ingKv"></dl>
+    <div id="ingLots"></div>
+    <div class="actions" id="ingActions" style="margin-top:14px"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -307,21 +431,23 @@ function h(tag,attrs){
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 
-var S={db:null,mem:[],rows:[],draft:[],urls:[],viewUrls:[],openId:null,dl:null,standalone:!(window.claude&&window.claude.use),lastExport:lsGet('ricezione.lastExport')};
+var S={db:null,dbBlocked:false,mem:[],sup:[],ric:[],ingr:[],lotti:[],memS:{},sec:'ricezione',confirmDel:null,rows:[],draft:[],urls:[],viewUrls:[],openId:null,dl:null,standalone:!(window.claude&&window.claude.use),lastExport:lsGet('ricezione.lastExport')};
 
 /* ---------- archivio locale (IndexedDB) ----------
    Tre archivi gia' pronti: bolle (in uso), ingredienti e ricette (per la tracciabilita' futura). */
 function idbOpen(){
   return new Promise(function(res,rej){
     var rq;
-    try{rq=indexedDB.open('haccp-ricezione',1);}catch(e){rej(e);return;}
+    try{rq=indexedDB.open('haccp-ricezione',3);}catch(e){rej(e);return;}
     rq.onupgradeneeded=function(){
       var d=rq.result;
       if(!d.objectStoreNames.contains('bolle')){d.createObjectStore('bolle',{keyPath:'id'}).createIndex('ts','ts');}
       if(!d.objectStoreNames.contains('ingredienti')){d.createObjectStore('ingredienti',{keyPath:'id'});}
       if(!d.objectStoreNames.contains('ricette')){d.createObjectStore('ricette',{keyPath:'id'});}
+      if(!d.objectStoreNames.contains('fornitori')){d.createObjectStore('fornitori',{keyPath:'id'});}
+      if(!d.objectStoreNames.contains('lotti')){d.createObjectStore('lotti',{keyPath:'id'});}
     };
-    rq.onsuccess=function(){res(rq.result);};
+    rq.onsuccess=function(){var d=rq.result;d.onversionchange=function(){d.close();};res(d);};
     rq.onerror=function(){rej(rq.error);};
     rq.onblocked=function(){rej(new Error('blocked'));};
   });
@@ -337,6 +463,9 @@ function tx(store,mode,fn){
 function dbAll(){return S.db?tx('bolle','readonly',function(s){return s.getAll();}).then(function(r){return r||[];}):Promise.resolve(S.mem.slice());}
 function dbPut(rec){if(S.db)return tx('bolle','readwrite',function(s){return s.put(rec);});S.mem.push(rec);return Promise.resolve();}
 function dbDel(id){if(S.db)return tx('bolle','readwrite',function(s){return s.delete(id);});S.mem=S.mem.filter(function(r){return r.id!==id;});return Promise.resolve();}
+function stAll(store){return S.db?tx(store,'readonly',function(s){return s.getAll();}).then(function(r){return r||[];}):Promise.resolve((S.memS[store]||[]).slice());}
+function stPut(store,rec){if(S.db)return tx(store,'readwrite',function(s){return s.put(rec);});(S.memS[store]=S.memS[store]||[]).push(rec);return Promise.resolve();}
+function stDel(store,id){if(S.db)return tx(store,'readwrite',function(s){return s.delete(id);});S.memS[store]=(S.memS[store]||[]).filter(function(r){return r.id!==id;});return Promise.resolve();}
 function uid(){return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,9);}
 
 /* ---------- formati ---------- */
@@ -422,14 +551,18 @@ function onSubmit(e){
   var t=parseTemp($('#temp').value);
   if(!S.draft.length){showErr('Fotografa il DDT prima di salvare.');return;}
   if(!supplier){showErr(isNew?'Scrivi il nome del nuovo fornitore.':'Scegli il fornitore dalla lista.');(isNew?$('#supplierNew'):$('#supplier')).focus();return;}
-  var same=S.rows.find(function(r){return r.supplier.toLowerCase()===supplier.toLowerCase();});
-  if(same)supplier=same.supplier;
+  var same=S.sup.find(function(s){return s.nome.toLowerCase()===supplier.toLowerCase();});
+  if(same)supplier=same.nome;
   if(!t.ok){showErr('La temperatura non è valida. Scrivi un numero, per esempio 3,5 oppure -18.');$('#temp').focus();return;}
   if(esito==='nc'&&!note){showErr('Se la merce non è conforme, scrivi nelle note qual è il problema.');$('#note').focus();return;}
   var rec={id:uid(),ts:Date.now(),supplier:supplier,ddt:$('#ddt').value.trim(),lot:$('#lot').value.trim(),temp:t.val,esito:esito,note:note,
     photos:S.draft.map(function(p){return p.blob;})};
   var btn=$('#btnSave');btn.disabled=true;
   dbPut(rec).then(function(){
+    if(same)return null;
+    var add={id:uid(),nome:supplier};
+    return stPut('fornitori',add).catch(function(){}).then(function(){S.sup.push(add);});
+  }).then(function(){
     S.rows.unshift(rec);S.rows.sort(function(a,b){return b.ts-a.ts;});
     resetForm();closeCompose();renderAll();toast('Ricezione salvata alle '+fmtTime(rec.ts)+'.');
   }).catch(function(){showErr('Salvataggio non riuscito. Controlla lo spazio libero sul dispositivo e riprova.');})
@@ -461,8 +594,7 @@ function renderList(){
   });
 }
 function renderSuppliers(){
-  var cnt={};S.rows.forEach(function(r){cnt[r.supplier]=(cnt[r.supplier]||0)+1;});
-  var sel=$('#supplier'),prev=sel.value,names=Object.keys(cnt).sort(function(a,b){return a.localeCompare(b,'it');});
+  var sel=$('#supplier'),prev=sel.value,names=S.sup.map(function(s){return s.nome;}).sort(function(a,b){return a.localeCompare(b,'it');});
   sel.textContent='';
   sel.append(h('option',{value:'',text:'Scegli fornitore…'}));
   names.forEach(function(s){sel.append(h('option',{value:s,text:s}));});
@@ -478,7 +610,9 @@ function toggleNewSupplier(focus){
 }
 function renderNotices(){
   var box=$('#notices');box.textContent='';
-  if(!S.db)box.append(h('div',{class:'notice warn'},h('span',{text:'Il salvataggio sul dispositivo non è disponibile in questa vista. Le ricezioni restano solo finché la pagina è aperta.'})));
+  if(!S.db)box.append(h('div',{class:'notice warn'},h('span',{text:S.dbBlocked
+    ?'L’archivio si sta aggiornando ma l’app è aperta altrove. Chiudi del tutto l’app (scorrila via dalle app aperte) e riaprila. Fino ad allora non salvare nulla.'
+    :'Il salvataggio sul dispositivo non è disponibile in questa vista. Le ricezioni restano solo finché la pagina è aperta.'})));
   if(S.rows.length){
     var oldest=Math.min.apply(null,S.rows.map(function(r){return r.ts;}));
     var ref=S.lastExport||oldest,days=Math.floor((Date.now()-ref)/864e5);
@@ -489,7 +623,453 @@ function renderNotices(){
     }
   }
 }
-function renderAll(){renderList();renderSuppliers();renderNotices();}
+function renderAll(){renderList();renderSuppliers();renderNotices();refreshLists();renderIngList();}
+
+/* ---------- sezioni, fornitori, ricette ---------- */
+var SECS={ricezione:'Ricezione merce',ingredienti:'Ingredienti',temperature:'Temperature frigo',lavorazioni:'Lavorazioni',etichette:'Etichette',storico:'Storico',ricette:'Ricette',fornitori:'Fornitori'};
+var ACTIVE={ricezione:1,ingredienti:1,ricette:1,fornitori:1};
+function buildTabs(){
+  var nav=$('#tabs');nav.textContent='';
+  Object.keys(SECS).forEach(function(k){
+    nav.append(h('button',{type:'button',class:'tab'+(ACTIVE[k]?'':' soon'),'data-sec':k,text:SECS[k],onclick:function(){showSection(k);}}));
+  });
+}
+function showSection(k){
+  S.sec=k;S.confirmDel=null;closeCompose();
+  var pageId=ACTIVE[k]?'sec-'+k:'sec-soon';
+  document.querySelectorAll('[data-page]').forEach(function(p){p.hidden=(p.id!==pageId);});
+  document.querySelectorAll('.tab').forEach(function(b){if(b.getAttribute('data-sec')===k)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
+  $('#fab').hidden=(k!=='ricezione');
+  $('#btnExport').hidden=(k!=='ricezione');
+  if(!ACTIVE[k])$('#soonTitle').textContent=SECS[k];
+  LAB.pendingIng=null;
+  refreshLists();
+  window.scrollTo(0,0);
+}
+function refreshLists(){renderSupList();renderRicList();}
+function pitem(id,name,sub,onDel){
+  var acts=S.confirmDel===id
+    ?h('span',{class:'item-actions'},
+        h('button',{type:'button',class:'small-btn plain',text:'Annulla',onclick:function(){S.confirmDel=null;refreshLists();}}),
+        h('button',{type:'button',class:'small-btn solid',text:'Conferma',onclick:onDel}))
+    :h('span',{class:'item-actions'},
+        h('button',{type:'button',class:'small-btn',text:'Elimina','aria-label':'Elimina '+name,onclick:function(){S.confirmDel=id;refreshLists();}}));
+  return h('div',{class:'pitem'},h('span',{class:'item-main'},h('span',{class:'item-name',text:name}),sub?h('span',{class:'item-sub',text:sub}):null),acts);
+}
+function showFormErr(id,msg){var e=$('#'+id);e.textContent=msg;e.hidden=false;}
+function byName(a,b){return a.nome.localeCompare(b.nome,'it');}
+
+function renderSupList(){
+  var box=$('#supList');box.textContent='';
+  var items=S.sup.slice().sort(byName);
+  $('#supCount').textContent=items.length?items.length+(items.length===1?' fornitore':' fornitori'):'';
+  if(!items.length){box.append(h('p',{class:'empty-s',text:'Ancora nessun fornitore. Aggiungine uno qui sopra, oppure scrivilo la prima volta nella ricezione.'}));return;}
+  items.forEach(function(s){
+    var n=S.rows.filter(function(r){return r.supplier.toLowerCase()===s.nome.toLowerCase();}).length;
+    box.append(pitem(s.id,s.nome,n?n+(n===1?' ricezione':' ricezioni'):'Nessuna ricezione',function(){delSup(s.id);}));
+  });
+}
+function onSupAdd(e){
+  e.preventDefault();$('#supErr').hidden=true;
+  var inp=$('#supName'),n=inp.value.trim().replace(/\s+/g,' ');
+  if(!n){showFormErr('supErr','Scrivi il nome del fornitore.');inp.focus();return;}
+  if(S.sup.some(function(s){return s.nome.toLowerCase()===n.toLowerCase();})){showFormErr('supErr','Questo fornitore è già in elenco.');return;}
+  var rec={id:uid(),nome:n};
+  stPut('fornitori',rec).then(function(){S.sup.push(rec);inp.value='';renderSuppliers();refreshLists();toast('Fornitore aggiunto.');})
+  .catch(function(){showFormErr('supErr','Salvataggio non riuscito. Riprova.');});
+}
+function delSup(id){
+  stDel('fornitori',id).then(function(){
+    S.sup=S.sup.filter(function(s){return s.id!==id;});S.confirmDel=null;
+    renderSuppliers();refreshLists();toast('Fornitore eliminato. Le ricezioni già registrate restano nel registro.');
+  }).catch(function(){toast('Eliminazione non riuscita. Riprova.');});
+}
+
+function renderRicList(){
+  var box=$('#ricList');box.textContent='';
+  var items=S.ric.slice().sort(byName);
+  $('#ricCount').textContent=items.length?items.length+(items.length===1?' ricetta':' ricette'):'';
+  if(!items.length){box.append(h('p',{class:'empty-s',text:'Ancora nessuna ricetta. Aggiungine una qui sopra.'}));return;}
+  items.forEach(function(r){box.append(pitem(r.id,r.nome,(r.ingredienti||[]).join(' · '),function(){delRic(r.id);}));});
+}
+function onRicAdd(e){
+  e.preventDefault();$('#ricErr').hidden=true;
+  var nm=$('#ricName'),ig=$('#ricIng'),n=nm.value.trim().replace(/\s+/g,' ');
+  var ings=ig.value.split(/[\n;]+/).map(function(x){return x.trim();}).filter(Boolean);
+  if(!n){showFormErr('ricErr','Scrivi il nome della ricetta.');nm.focus();return;}
+  if(!ings.length){showFormErr('ricErr','Scrivi almeno un ingrediente, uno per riga.');ig.focus();return;}
+  if(S.ric.some(function(r){return r.nome.toLowerCase()===n.toLowerCase();})){showFormErr('ricErr','Esiste già una ricetta con questo nome.');return;}
+  var rec={id:uid(),nome:n,ingredienti:ings};
+  stPut('ricette',rec).then(function(){S.ric.push(rec);nm.value='';ig.value='';refreshLists();toast('Ricetta aggiunta.');})
+  .catch(function(){showFormErr('ricErr','Salvataggio non riuscito. Riprova.');});
+}
+function delRic(id){
+  stDel('ricette',id).then(function(){
+    S.ric=S.ric.filter(function(r){return r.id!==id;});S.confirmDel=null;refreshLists();toast('Ricetta eliminata.');
+  }).catch(function(){toast('Eliminazione non riuscita. Riprova.');});
+}
+async function migrateSuppliers(){
+  /* una sola volta: i fornitori gia' scritti nelle ricezioni passano nell'elenco */
+  if(lsGet('ricezione.supMigrato'))return;
+  var have={};S.sup.forEach(function(s){have[s.nome.toLowerCase()]=1;});
+  for(var i=0;i<S.rows.length;i++){
+    var n=S.rows[i].supplier,k=n.toLowerCase();
+    if(have[k])continue;have[k]=1;
+    var rec={id:uid(),nome:n};
+    try{await stPut('fornitori',rec);S.sup.push(rec);}catch(e){return;}
+  }
+  lsSet('ricezione.supMigrato',true);
+}
+
+/* ---------- ingredienti, lotti, lettura delle etichette ---------- */
+/* ==parse== (funzioni pure: leggono il testo dell'etichetta) */
+var MESI={gen:1,jan:1,feb:2,mar:3,apr:4,mag:5,may:5,giu:6,jun:6,lug:7,jul:7,ago:8,aug:8,set:9,sep:9,ott:10,oct:10,nov:11,dic:12,dec:12};
+function p2s(n){return (n<10?'0':'')+n;}
+function cleanOcr(t){
+  return String(t||'').replace(/[‐-―]/g,'-')
+    .replace(/(\d)[Oo](?=[\d\/.\-])/g,function(m,a){return a+'0';})
+    .replace(/([\/.\-])[Oo](?=\d)/g,function(m,a){return a+'0';});
+}
+function validYmd(y,m,d){
+  if(y<2000||y>2100||m<1||m>12||d<1||d>31)return null;
+  var dt=new Date(y,m-1,d);
+  if(dt.getFullYear()!==y||dt.getMonth()!==m-1||dt.getDate()!==d)return null;
+  return y+'-'+p2s(m)+'-'+p2s(d);
+}
+function fullYear(s){var n=Number(s);return s.length===2?2000+n:n;}
+function parseDateAt(s){
+  var m;
+  if((m=/^(\d{4})\s*[\-\/.]\s*(\d{1,2})\s*[\-\/.]\s*(\d{1,2})/.exec(s))){var a=validYmd(+m[1],+m[2],+m[3]);if(a)return {iso:a,len:m[0].length};}
+  if((m=/^(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*(\d{4}|\d{2})(?!\d)/.exec(s))){var b=validYmd(fullYear(m[3]),+m[2],+m[1]);if(b)return {iso:b,len:m[0].length};}
+  if((m=/^(\d{1,2})\s*[\s.\-\/]\s*([A-Za-z]{3})[A-Za-z]*\.?\s*[\s.\-\/]?\s*(\d{4}|\d{2})(?!\d)/.exec(s))){
+    var mo=MESI[m[2].toLowerCase()];if(mo){var c=validYmd(fullYear(m[3]),mo,+m[1]);if(c)return {iso:c,len:m[0].length};}}
+  if((m=/^(\d{1,2})\s*[\/.\-]\s*(\d{4})(?!\d)/.exec(s))){
+    var mm=+m[1],yy=+m[2];
+    if(mm>=1&&mm<=12&&yy>=2000&&yy<=2100){var last=new Date(yy,mm,0).getDate();return {iso:yy+'-'+p2s(mm)+'-'+p2s(last),len:m[0].length};}}
+  return null;
+}
+function scanDates(t){
+  var out=[],i=0;
+  while(i<t.length){
+    if(/\d/.test(t.charAt(i))&&(i===0||!/\d/.test(t.charAt(i-1)))){
+      var r=parseDateAt(t.slice(i,i+26));
+      if(r){out.push({iso:r.iso,idx:i,end:i+r.len});i+=r.len;continue;}
+    }
+    i++;
+  }
+  return out;
+}
+function findExpiry(text,now){
+  var t=cleanOcr(text),today=now?new Date(now):new Date();today.setHours(0,0,0,0);
+  var lo=new Date(today.getTime()-90*864e5),hi=new Date(today.getFullYear()+15,today.getMonth(),today.getDate());
+  var all=scanDates(t).filter(function(x){var d=new Date(x.iso+'T00:00:00');return d>=lo&&d<=hi;});
+  if(!all.length)return '';
+  var kw=/(da\s+consumarsi\s+(?:preferibilmente\s+)?entro|da\s+consumare\s+(?:preferibilmente\s+)?entro|consumare\s+(?:preferibilmente\s+)?entro|scadenza|scad\.?|termine\s+minimo\s+di\s+conservazione|t\.?\s?m\.?\s?c\.?|entro\s+il|exp\.?(?:iry)?(?:\s+date)?|use\s+by|best\s+before)/ig,m;
+  while((m=kw.exec(t))){
+    var from=m.index+m[0].length;
+    for(var i=0;i<all.length;i++){if(all[i].idx>=from-1&&all[i].idx-from<=40)return all[i].iso;}
+  }
+  return all.length===1?all[0].iso:'';
+}
+function findLot(text){
+  var t=cleanOcr(text).replace(/\r/g,''),m,v;
+  var p1=/\b(?:lotto|lot|batch)\b\.?\s*(?:n\.?|n°|nr\.?|no\.?|#)?\s*[:.\-]?\s*([A-Z0-9][A-Z0-9\-\/.]{2,19})/ig;
+  while((m=p1.exec(t))){v=m[1].replace(/[.\-\/]+$/,'');if(/\d/.test(v)&&v.length>=3)return v.toUpperCase();}
+  var p2=/\bL\s*[:.\-]?\s*([A-Z]{0,2}\d[A-Z0-9\-\/.]{3,17})/g;
+  while((m=p2.exec(t))){v=m[1].replace(/[.\-\/]+$/,'');if(v.length>=4)return v.toUpperCase();}
+  return '';
+}
+function normTxt(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+function guessProduct(text,items){
+  var t=' '+normTxt(text).replace(/[^a-z0-9]+/g,' ')+' ',best=null,bw=0;
+  items.forEach(function(g){
+    var w=normTxt(g.nome).split(/[^a-z0-9]+/).filter(function(x){return x.length>=3;});
+    if(!w.length)return;
+    var all=w.every(function(x){return t.indexOf(' '+x)>=0;});
+    if(all&&w.length>bw){best=g;bw=w.length;}
+  });
+  return best;
+}
+/* ==/parse== */
+
+function fmtIso(s){var p=String(s).split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;}
+function daysTo(iso){var t=new Date();t.setHours(0,0,0,0);return Math.round((new Date(iso+'T00:00:00')-t)/864e5);}
+function ingById(id){return S.ingr.find(function(g){return g.id===id;})||null;}
+function lotsOf(id){return S.lotti.filter(function(l){return l.ingId===id;}).sort(function(a,b){return b.ts-a.ts;});}
+function scadChip(scad){
+  if(!scad)return null;
+  var d=daysTo(scad);
+  if(d<0)return h('span',{class:'pill nc',text:'Scaduto il '+fmtIso(scad)});
+  if(d<=3)return h('span',{class:'pill nc',text:d===0?'Scade oggi':'Scade tra '+d+(d===1?' giorno':' giorni')});
+  return h('span',{class:'chip mono',text:'Scad. '+fmtIso(scad)});
+}
+function renderIngList(){
+  var box=$('#ingList');box.textContent='';
+  var items=S.ingr.slice().sort(byName);
+  $('#ingCount').textContent=items.length?items.length+(items.length===1?' ingrediente':' ingredienti'):'';
+  if(!items.length){box.append(h('p',{class:'empty-s',text:'Ancora nessun ingrediente. Fotografa la prima etichetta.'}));return;}
+  var grid=h('div',{class:'cards'});
+  items.forEach(function(g){
+    var ls=lotsOf(g.id),last=ls[0];
+    grid.append(h('button',{class:'card',type:'button','aria-label':'Apri '+g.nome,onclick:function(){openIng(g.id);}},
+      h('span',{class:'card-body'},
+        h('span',{class:'card-sup',text:g.nome}),
+        h('span',{class:'card-meta',text:[g.fornitore,ls.length+(ls.length===1?' lotto':' lotti')].filter(Boolean).join('  ·  ')}),
+        h('span',{class:'chips'},last?scadChip(last.scad):null))));
+  });
+  box.append(grid);
+}
+
+/* libri di lettura, caricati solo quando servono */
+var LIBS={tess:'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',zx:'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js'};
+var libP={};
+function loadLib(url){
+  if(libP[url])return libP[url];
+  libP[url]=new Promise(function(res,rej){var s=document.createElement('script');s.src=url;s.onload=function(){res();};s.onerror=function(){delete libP[url];rej(new Error('lib'));};document.head.append(s);});
+  return libP[url];
+}
+async function readBarcode(blob){
+  if('BarcodeDetector' in window){
+    try{
+      var fm=await BarcodeDetector.getSupportedFormats();
+      var use=['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf','qr_code','data_matrix'].filter(function(f){return fm.indexOf(f)>=0;});
+      if(use.length){
+        var bmp=await createImageBitmap(blob);
+        var r=await new BarcodeDetector({formats:use}).detect(bmp);
+        if(bmp.close)bmp.close();
+        if(r&&r.length&&r[0].rawValue)return String(r[0].rawValue);
+      }
+    }catch(e){}
+  }
+  try{
+    await loadLib(LIBS.zx);
+    var hints=new Map();hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+    var rd=new ZXing.BrowserMultiFormatReader(hints),u=URL.createObjectURL(blob);
+    try{var res=await rd.decodeFromImageUrl(u);return res?String(res.getText()):'';}
+    finally{URL.revokeObjectURL(u);try{rd.reset();}catch(e){}}
+  }catch(e){return '';}
+}
+function ocrCanvas(blob){
+  return new Promise(function(res,rej){
+    var url=URL.createObjectURL(blob),img=new Image();
+    img.onload=function(){
+      var w=img.naturalWidth,hh=img.naturalHeight,c=document.createElement('canvas');
+      c.width=w;c.height=hh;
+      var cx=c.getContext('2d');cx.drawImage(img,0,0,w,hh);URL.revokeObjectURL(url);
+      var d=cx.getImageData(0,0,w,hh),px=d.data,hist=new Array(256).fill(0),i,g;
+      for(i=0;i<px.length;i+=4){g=Math.round(0.299*px[i]+0.587*px[i+1]+0.114*px[i+2]);px[i]=g;hist[g]++;}
+      var tot=w*hh,acc=0,lo=0,hi=255;
+      for(i=0;i<256;i++){acc+=hist[i];if(acc>=tot*0.02){lo=i;break;}}
+      acc=0;for(i=255;i>=0;i--){acc+=hist[i];if(acc>=tot*0.02){hi=i;break;}}
+      var span=Math.max(1,hi-lo);
+      for(i=0;i<px.length;i+=4){g=Math.max(0,Math.min(255,Math.round((px[i]-lo)*255/span)));px[i]=px[i+1]=px[i+2]=g;}
+      cx.putImageData(d,0,0);res(c);
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);rej(new Error('img'));};
+    img.src=url;
+  });
+}
+async function readText(blob,onP){
+  await loadLib(LIBS.tess);
+  var cv=await ocrCanvas(blob);
+  var w=await Tesseract.createWorker('ita',1,{logger:function(m){if(m&&m.status==='recognizing text'&&onP)onP(Math.round(m.progress*100));}});
+  LAB.worker=w;
+  try{
+    try{await w.setParameters({tessedit_pageseg_mode:'11'});}catch(e){}
+    var r=await w.recognize(cv);
+    return (r&&r.data&&r.data.text)||'';
+  }finally{LAB.worker=null;try{await w.terminate();}catch(e){}}
+}
+
+/* modulo di conferma dell'etichetta */
+var LAB={token:0,blob:null,url:null,worker:null,pendingIng:null};
+function lblStatus(m){$('#labStatus').textContent=m;}
+function labFlag(id,flag){var f=$('#'+id).closest('.field');if(!f)return;if(flag)f.setAttribute('data-flag',flag);else f.removeAttribute('data-flag');}
+function labTouched(id){return $('#'+id).getAttribute('data-touched')==='1';}
+function labUserEdit(e){var id=e.target&&e.target.id;if(!id)return;e.target.setAttribute('data-touched','1');labFlag(id,null);}
+function labSet(id,val,flag){
+  var el=$('#'+id);
+  if(el.value||labTouched(id))return;
+  if(val){el.value=val;labFlag(id,flag);}else labFlag(id,'missing');
+}
+function fillLabSelects(ingId){
+  var ps=$('#labProd');ps.textContent='';
+  ps.append(h('option',{value:'',text:'Scegli prodotto…'}));
+  S.ingr.slice().sort(byName).forEach(function(g){ps.append(h('option',{value:g.id,text:g.nome}));});
+  ps.append(h('option',{value:'__new__',text:'➕ Nuovo prodotto…'}));
+  ps.value=ingId||(S.ingr.length?'':'__new__');
+  if(ps.value!==(ingId||(S.ingr.length?'':'__new__')))ps.value='';
+  var ss=$('#labSup');ss.textContent='';
+  ss.append(h('option',{value:'',text:'Nessuno / non so'}));
+  S.sup.map(function(s){return s.nome;}).sort(function(a,b){return a.localeCompare(b,'it');}).forEach(function(n){ss.append(h('option',{value:n,text:n}));});
+}
+function labProdChanged(focus){
+  var v=$('#labProd').value,inp=$('#labProdNew');
+  inp.hidden=(v!=='__new__');
+  if(v==='__new__'&&focus)inp.focus();
+  var g=ingById(v);
+  if(g){
+    if(!$('#labSup').value&&g.fornitore)$('#labSup').value=g.fornitore;
+    if(!$('#labCode').value&&g.barcode)$('#labCode').value=g.barcode;
+  }
+}
+function openLabelSheet(ingId){
+  LAB.token++;LAB.blob=null;
+  if(LAB.url){URL.revokeObjectURL(LAB.url);LAB.url=null;}
+  $('#labForm').reset();
+  ['labProd','labProdNew','labSup','labLot','labScad','labCode'].forEach(function(i){$('#'+i).removeAttribute('data-touched');labFlag(i,null);});
+  fillLabSelects(ingId);labProdChanged(false);
+  $('#labThumb').textContent='';$('#labErr').hidden=true;lblStatus('');
+  $('#labSheet').hidden=false;
+  $('#labSheet .panel').scrollTop=0;
+}
+function closeLabel(){
+  LAB.token++;LAB.ingBack=null;
+  if(LAB.worker){try{LAB.worker.terminate();}catch(e){}LAB.worker=null;}
+  $('#labSheet').hidden=true;
+  if(LAB.url){URL.revokeObjectURL(LAB.url);LAB.url=null;}
+  LAB.blob=null;
+}
+async function startLabel(file,ingId){
+  openLabelSheet(ingId);
+  var my=LAB.token;
+  lblStatus('Preparo la foto…');
+  var blob;
+  try{blob=await shrink(file);}catch(e){lblStatus('Non riesco a leggere questa foto. Riprova, oppure compila a mano.');return;}
+  if(my!==LAB.token)return;
+  LAB.blob=blob;LAB.url=URL.createObjectURL(blob);
+  $('#labThumb').append(h('div',{class:'dthumb'},h('img',{src:LAB.url,alt:'Foto dell’etichetta'})));
+  lblStatus('Cerco il codice a barre…');
+  var code='';try{code=await readBarcode(blob);}catch(e){}
+  if(my!==LAB.token)return;
+  if(code){
+    if(!$('#labCode').value&&!labTouched('labCode')){$('#labCode').value=code;labFlag('labCode','check');}
+    var known=S.ingr.find(function(g){return g.barcode&&g.barcode===code;});
+    if(known&&!$('#labProd').value&&!labTouched('labProd')){$('#labProd').value=known.id;labProdChanged(false);labFlag('labProd','check');}
+  }
+  lblStatus('Leggo il testo… (alla prima volta può servire un po\')');
+  var text='',ocrErr=false;
+  try{text=await readText(blob,function(p){if(my===LAB.token)lblStatus('Leggo il testo… '+p+'%');});}catch(e){ocrErr=true;}
+  if(my!==LAB.token)return;
+  var lot=findLot(text),scad=findExpiry(text);
+  labSet('labLot',lot,'check');labSet('labScad',scad,'check');
+  if(!$('#labProd').value&&!labTouched('labProd')){
+    var gg=guessProduct(text,S.ingr);
+    if(gg){$('#labProd').value=gg.id;labProdChanged(false);labFlag('labProd','check');}
+  }
+  var found=[];if(code)found.push('codice a barre');if(lot)found.push('lotto');if(scad)found.push('scadenza');
+  if(ocrErr&&!code)lblStatus('Lettura non riuscita: la prima volta serve internet. Compila i campi a mano.');
+  else if(ocrErr)lblStatus('Letto il codice a barre. Il testo non si è letto (serve internet la prima volta): compila lotto e scadenza a mano.');
+  else if(found.length)lblStatus('Letto: '+found.join(', ')+'. Controlla i campi evidenziati e conferma.');
+  else lblStatus('Non sono riuscito a leggere nulla di sicuro. Prova con una foto più vicina e luminosa, oppure compila a mano.');
+}
+function labErr(m){var e=$('#labErr');e.textContent=m;e.hidden=false;}
+function saveLabel(e){
+  e.preventDefault();$('#labErr').hidden=true;
+  var sel=$('#labProd').value,g=null,nome='';
+  if(sel==='__new__'){
+    nome=$('#labProdNew').value.trim().replace(/\s+/g,' ');
+    if(!nome){labErr('Scrivi il nome del nuovo prodotto.');$('#labProdNew').focus();return;}
+    g=S.ingr.find(function(x){return x.nome.toLowerCase()===nome.toLowerCase();})||null;
+  }else if(sel){g=ingById(sel);}
+  if(!g&&!nome){labErr('Scegli il prodotto dalla lista.');$('#labProd').focus();return;}
+  var lot=$('#labLot').value.trim(),scad=$('#labScad').value,code=$('#labCode').value.replace(/\s+/g,''),forn=$('#labSup').value;
+  if(!lot){labErr('Scrivi il lotto. Se sull’etichetta non c’è, scrivi: senza lotto.');$('#labLot').focus();return;}
+  if(code){
+    var other=S.ingr.find(function(x){return x.barcode===code&&(!g||x.id!==g.id);});
+    if(other){labErr('Questo codice a barre è già del prodotto «'+other.nome+'». Scegli quel prodotto oppure correggi il codice.');$('#labCode').focus();return;}
+  }
+  var rec=g?{id:g.id,nome:g.nome,fornitore:g.fornitore||'',barcode:g.barcode||''}:{id:uid(),nome:nome,fornitore:'',barcode:''};
+  if(code&&!rec.barcode)rec.barcode=code;
+  if(forn&&!rec.fornitore)rec.fornitore=forn;
+  var lotRec={id:uid(),ingId:rec.id,lotto:lot,scad:scad||'',ts:Date.now(),photo:LAB.blob||null};
+  var btn=$('#labSave');btn.disabled=true;
+  stPut('ingredienti',rec).then(function(){return stPut('lotti',lotRec);}).then(function(){
+    var i=S.ingr.findIndex(function(x){return x.id===rec.id;});
+    if(i>=0)S.ingr[i]=rec;else S.ingr.push(rec);
+    S.lotti.push(lotRec);
+    var back=LAB.ingBack;LAB.ingBack=null;
+    closeLabel();renderIngList();
+    toast('Salvato: '+rec.nome+' · lotto '+lot+(scad?' · scad. '+fmtIso(scad):'')+'.');
+    if(back)openIng(back);
+  }).catch(function(){labErr('Salvataggio non riuscito. Controlla lo spazio libero sul dispositivo e riprova.');})
+  .then(function(){btn.disabled=false;});
+}
+
+/* scheda di un ingrediente */
+var ING={id:null,confirm:null};
+function showPhoto(b){
+  var u=URL.createObjectURL(b);
+  var o=h('div',{class:'overlay shot',role:'dialog','aria-modal':'true',onclick:function(){URL.revokeObjectURL(u);o.remove();}},h('img',{src:u,alt:'Foto dell’etichetta'}));
+  document.body.append(o);
+}
+function openIng(id){ING.id=id;ING.confirm=null;renderIngSheet();$('#ingSheet').hidden=false;}
+function closeIng(){$('#ingSheet').hidden=true;revokeAll(S.viewUrls);ING.id=null;}
+function renderIngSheet(){
+  var g=ingById(ING.id);if(!g){closeIng();return;}
+  revokeAll(S.viewUrls);
+  $('#ingTitle').textContent=g.nome;
+  var ls=lotsOf(g.id);
+  $('#ingSub').textContent=ls.length+(ls.length===1?' lotto registrato':' lotti registrati');
+  var kv=$('#ingKv');kv.textContent='';
+  if(g.fornitore)kv.append(h('dt',{text:'Fornitore'}),h('dd',{text:g.fornitore}));
+  if(g.barcode)kv.append(h('dt',{text:'Codice a barre'}),h('dd',{class:'mono',text:g.barcode}));
+  var box=$('#ingLots');box.textContent='';
+  ls.forEach(function(l){
+    var u=null;if(l.photo){u=URL.createObjectURL(l.photo);S.viewUrls.push(u);}
+    var acts=ING.confirm===l.id
+      ?h('span',{class:'item-actions'},
+          h('button',{type:'button',class:'small-btn plain',text:'Annulla',onclick:function(){ING.confirm=null;renderIngSheet();}}),
+          h('button',{type:'button',class:'small-btn solid',text:'Conferma',onclick:function(){delLot(l.id);}}))
+      :h('button',{type:'button',class:'small-btn',text:'Elimina','aria-label':'Elimina il lotto '+l.lotto,onclick:function(){ING.confirm=l.id;renderIngSheet();}});
+    box.append(h('div',{class:'lotrow'},
+      u?h('button',{type:'button',class:'thumbbtn','aria-label':'Apri la foto',onclick:function(){showPhoto(l.photo);}},h('img',{src:u,alt:''})):h('span',{class:'thumbbtn'}),
+      h('span',{class:'lotinfo'},h('b',{text:'Lotto '+l.lotto}),h('span',{class:'card-meta',text:(l.scad?'Scad. '+fmtIso(l.scad):'Senza scadenza')+'  ·  registrato il '+fmtDateTime(l.ts)})),
+      acts));
+  });
+  if(!ls.length)box.append(h('p',{class:'info',text:'Nessun lotto registrato.'}));
+  var a=$('#ingActions');a.textContent='';
+  if(ING.confirm==='ing'){
+    a.append(h('button',{type:'button',text:'Annulla',onclick:function(){ING.confirm=null;renderIngSheet();}}),
+             h('button',{type:'button',class:'danger solid',text:'Conferma: elimina tutto',onclick:delIng}));
+  }else{
+    a.append(h('button',{type:'button',class:'danger',text:'Elimina ingrediente',onclick:function(){ING.confirm='ing';renderIngSheet();}}),
+             h('button',{type:'button',text:'Chiudi',onclick:closeIng}),
+             h('button',{type:'button',class:'solid',text:'Aggiungi lotto',onclick:function(){
+               var id=ING.id;closeIng();LAB.pendingIng=id;LAB.ingBack=id;$('#labCam').click();}}));
+  }
+}
+function delLot(id){
+  stDel('lotti',id).then(function(){
+    S.lotti=S.lotti.filter(function(l){return l.id!==id;});ING.confirm=null;
+    renderIngSheet();renderIngList();toast('Lotto eliminato.');
+  }).catch(function(){toast('Eliminazione non riuscita. Riprova.');});
+}
+function delIng(){
+  var id=ING.id,ids=lotsOf(id).map(function(l){return l.id;});
+  var chain=Promise.resolve();
+  ids.forEach(function(x){chain=chain.then(function(){return stDel('lotti',x);});});
+  chain.then(function(){return stDel('ingredienti',id);}).then(function(){
+    S.lotti=S.lotti.filter(function(l){return l.ingId!==id;});
+    S.ingr=S.ingr.filter(function(g){return g.id!==id;});
+    closeIng();renderIngList();toast('Ingrediente eliminato.');
+  }).catch(function(){toast('Eliminazione non riuscita. Riprova.');});
+}
+function buildLotsCsv(){
+  var out=[['Registrato il','Ora','Prodotto','Fornitore','Codice a barre','Lotto','Scadenza']];
+  S.lotti.slice().sort(function(a,b){return a.ts-b.ts;}).forEach(function(l){
+    var g=ingById(l.ingId)||{};
+    out.push([fmtDate(l.ts),fmtTime(l.ts),g.nome||'',g.fornitore||'',g.barcode||'',l.lotto,l.scad?fmtIso(l.scad):'']);
+  });
+  return '﻿'+out.map(function(r){return r.map(csvCell).join(';');}).join('\r\n');
+}
+async function exportLotti(){
+  if(!S.lotti.length){toast('Non ci sono ancora lotti da esportare.');return;}
+  try{
+    await saveFile('lotti-ingredienti-'+dayKey(Date.now())+'.csv',buildLotsCsv());
+    toast('File salvato. Ora allegalo a una mail.');
+  }catch(e){toast(e&&e.code==='declined'?'Salvataggio annullato.':'Non sono riuscito a preparare il file. Riprova.');}
+}
 
 /* ---------- dettaglio ---------- */
 function closeViewer(){$('#viewer').hidden=true;revokeAll(S.viewUrls);S.openId=null;}
@@ -665,21 +1245,42 @@ function bind(){
   $('#signBtn').addEventListener('click',function(){var t=$('#temp'),v=t.value.trim();t.value=(v.charAt(0)==='-'||v.charAt(0)==='−')?v.slice(1):'-'+v;t.focus();});
   $('#form').addEventListener('submit',onSubmit);
   $('#supplier').addEventListener('change',function(){toggleNewSupplier(true);});
+  $('#supForm').addEventListener('submit',onSupAdd);
+  $('#ricForm').addEventListener('submit',onRicAdd);
   $('#period').addEventListener('change',updateExportInfo);
   $('#btnPdf').addEventListener('click',function(){doExport('pdf');});
   $('#btnCsv').addEventListener('click',function(){doExport('csv');});
   $('#btnEClose').addEventListener('click',function(){$('#exportSheet').hidden=true;});
   $('#viewer').addEventListener('click',function(e){if(e.target===this)closeViewer();});
   $('#exportSheet').addEventListener('click',function(e){if(e.target===this)this.hidden=true;});
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'){if(!$('#viewer').hidden)closeViewer();else if(!$('#exportSheet').hidden)$('#exportSheet').hidden=true;else closeCompose();}});
+  $('#labCam').addEventListener('change',function(){var f=this.files&&this.files[0];this.value='';if(f)startLabel(f,LAB.pendingIng);});
+  $('#labGal').addEventListener('change',function(){var f=this.files&&this.files[0];this.value='';if(f)startLabel(f,LAB.pendingIng);});
+  $('#labShoot').addEventListener('click',function(){LAB.pendingIng=null;LAB.ingBack=null;});
+  $('#labPickGal').addEventListener('click',function(){LAB.pendingIng=null;LAB.ingBack=null;$('#labGal').click();});
+  $('#labManual').addEventListener('click',function(){LAB.pendingIng=null;LAB.ingBack=null;openLabelSheet(null);lblStatus('Inserimento a mano, senza foto. Compila i campi.');});
+  $('#labForm').addEventListener('submit',saveLabel);
+  $('#labForm').addEventListener('input',labUserEdit);
+  $('#labForm').addEventListener('change',labUserEdit);
+  $('#labProd').addEventListener('change',function(){labProdChanged(true);});
+  $('#labCancel').addEventListener('click',closeLabel);
+  $('#ingSheet').addEventListener('click',function(e){if(e.target===this)closeIng();});
+  $('#btnLotExport').addEventListener('click',exportLotti);
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){if(!$('#viewer').hidden)closeViewer();else if(!$('#exportSheet').hidden)$('#exportSheet').hidden=true;else if(!$('#ingSheet').hidden)closeIng();else if(!$('#labSheet').hidden)closeLabel();else closeCompose();}});
 }
 async function boot(){
   bind();
-  try{S.db=await idbOpen();}catch(e){S.db=null;}
+  try{S.db=await idbOpen();}catch(e){S.db=null;S.dbBlocked=!!(e&&e.message==='blocked');}
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
   try{S.rows=await dbAll();}catch(e){S.rows=[];}
   S.rows.sort(function(a,b){return b.ts-a.ts;});
+  try{S.sup=await stAll('fornitori');}catch(e){S.sup=[];}
+  try{S.ric=await stAll('ricette');}catch(e){S.ric=[];}
+  try{S.ingr=await stAll('ingredienti');}catch(e){S.ingr=[];}
+  try{S.lotti=await stAll('lotti');}catch(e){S.lotti=[];}
+  try{await migrateSuppliers();}catch(e){}
+  buildTabs();
   renderAll();
+  showSection('ricezione');
   try{
     if(window.claude&&window.claude.use){
       window.claude.use('downloads').then(function(d){S.dl=d||null;if(!$('#exportSheet').hidden)updateExportInfo();}).catch(function(){S.dl=null;});
