@@ -169,6 +169,11 @@ input[type=date]{display:block;width:100%;min-height:52px;padding:10px 12px;bord
 .lotinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
 .overlay.shot{align-items:center;padding:12px;z-index:50}
 .shot img{max-width:100%;max-height:100%;border-radius:8px}
+.tblock{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}
+.tblock .lbl{margin:0 0 8px}
+.tblock .addbtn{width:100%;margin-top:10px}
+.radio{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding:6px 0;cursor:pointer}
+.radio input{flex:0 0 22px;width:22px;height:22px;margin:2px 0 0}
 @media (min-width:760px){
   .fab,.sheet-close{display:none}
   .layout{grid-template-columns:minmax(330px,400px) 1fr;gap:28px}
@@ -321,6 +326,25 @@ input[type=date]{display:block;width:100%;min-height:52px;padding:10px 12px;bord
     <p class="hint">Consiglio: foto ravvicinata, ben illuminata, con il testo dritto.</p>
     <div id="ingList"></div>
     <button type="button" class="ghost" id="btnLotExport">Esporta lotti (CSV)</button>
+  </section>
+
+  <section class="page" id="sec-trasferimento" data-page hidden aria-label="Trasferimento dati">
+    <h2 class="list-title">Trasferimento dati</h2>
+    <p class="info">Per spostare tutto da un dispositivo all’altro: esporta un file da qui, poi importalo sull’altro dispositivo.</p>
+    <p class="info mono" id="trCounts"></p>
+    <div class="tblock">
+      <p class="lbl">Esporta tutto</p>
+      <label class="radio"><input type="checkbox" id="trPhotos" checked><span>Includi le foto (il file diventa più grande)</span></label>
+      <button type="button" class="addbtn" id="trExport">Esporta tutto</button>
+    </div>
+    <div class="tblock">
+      <p class="lbl">Importa file</p>
+      <label class="radio"><input type="radio" name="trMode" value="merge" checked><span><b>Unisci</b> ai dati di questo dispositivo, senza duplicati (consigliato)</span></label>
+      <label class="radio"><input type="radio" name="trMode" value="replace"><span><b>Sostituisci</b> tutto con i dati del file</span></label>
+      <button type="button" class="addbtn" id="trImport">Scegli il file e importa</button>
+      <input class="sr" id="trFile" type="file" accept=".json,application/json">
+    </div>
+    <p class="info" id="trMsg" role="status" aria-live="polite"></p>
   </section>
 
   <section class="page" id="sec-soon" data-page hidden aria-label="Sezione in preparazione">
@@ -623,11 +647,11 @@ function renderNotices(){
     }
   }
 }
-function renderAll(){renderList();renderSuppliers();renderNotices();refreshLists();renderIngList();}
+function renderAll(){renderList();renderSuppliers();renderNotices();refreshLists();renderIngList();renderTrInfo();}
 
 /* ---------- sezioni, fornitori, ricette ---------- */
-var SECS={ricezione:'Ricezione merce',ingredienti:'Ingredienti',temperature:'Temperature frigo',lavorazioni:'Lavorazioni',etichette:'Etichette',storico:'Storico',ricette:'Ricette',fornitori:'Fornitori'};
-var ACTIVE={ricezione:1,ingredienti:1,ricette:1,fornitori:1};
+var SECS={ricezione:'Ricezione merce',ingredienti:'Ingredienti',temperature:'Temperature frigo',lavorazioni:'Lavorazioni',etichette:'Etichette',storico:'Storico',ricette:'Ricette',fornitori:'Fornitori',trasferimento:'Trasferimento'};
+var ACTIVE={ricezione:1,ingredienti:1,ricette:1,fornitori:1,trasferimento:1};
 function buildTabs(){
   var nav=$('#tabs');nav.textContent='';
   Object.keys(SECS).forEach(function(k){
@@ -643,7 +667,7 @@ function showSection(k){
   $('#btnExport').hidden=(k!=='ricezione');
   if(!ACTIVE[k])$('#soonTitle').textContent=SECS[k];
   LAB.pendingIng=null;
-  refreshLists();
+  refreshLists();renderTrInfo();
   window.scrollTo(0,0);
 }
 function refreshLists(){renderSupList();renderRicList();}
@@ -1071,6 +1095,150 @@ async function exportLotti(){
   }catch(e){toast(e&&e.code==='declined'?'Salvataggio annullato.':'Non sono riuscito a preparare il file. Riprova.');}
 }
 
+/* ---------- trasferimento dei dati tra dispositivi ---------- */
+var TR_STORES=['bolle','fornitori','ricette','ingredienti','lotti'];
+var TR_NAMES={bolle:'ricezioni',fornitori:'fornitori',ricette:'ricette',ingredienti:'ingredienti',lotti:'lotti'};
+function allOf(store){return store==='bolle'?dbAll():stAll(store);}
+function putTo(store,rec){return store==='bolle'?dbPut(rec):stPut(store,rec);}
+function clearStore(store){
+  if(S.db)return tx(store,'readwrite',function(s){return s.clear();});
+  if(store==='bolle')S.mem=[];else S.memS[store]=[];
+  return Promise.resolve();
+}
+function renderTrInfo(){
+  var el=$('#trCounts');if(!el)return;
+  el.textContent=S.rows.length+' ricezioni · '+S.sup.length+' fornitori · '+S.ric.length+' ricette · '+S.ingr.length+' ingredienti · '+S.lotti.length+' lotti';
+}
+function trMsg(m){$('#trMsg').textContent=m;}
+function dataToBlob(u){
+  var m=/^data:([^;,]*);base64,([\s\S]*)$/.exec(String(u||''));
+  if(!m)return null;
+  var bin=atob(m[2]),n=bin.length,a=new Uint8Array(n);
+  for(var i=0;i<n;i++)a[i]=bin.charCodeAt(i);
+  return new Blob([a],{type:m[1]||'image/jpeg'});
+}
+async function serializeRec(rec,withPhotos){
+  var c=Object.assign({},rec);
+  if(Array.isArray(c.photos))c.photos=withPhotos?await Promise.all(c.photos.map(blobToDataURL)):[];
+  if('photo' in c)c.photo=(withPhotos&&c.photo)?await blobToDataURL(c.photo):null;
+  return JSON.stringify(c);
+}
+async function buildBackup(withPhotos){
+  var parts=['{"app":"haccp-ricezione","versione":1,"creato":'+JSON.stringify(new Date().toISOString())+',"foto":'+(withPhotos?'true':'false')+',"dati":{'];
+  for(var i=0;i<TR_STORES.length;i++){
+    var k=TR_STORES[i],recs=await allOf(k);
+    parts.push((i?',':'')+JSON.stringify(k)+':[');
+    for(var j=0;j<recs.length;j++)parts.push((j?',':'')+await serializeRec(recs[j],withPhotos));
+    parts.push(']');
+  }
+  parts.push('}}');
+  return new Blob(parts,{type:'application/json'});
+}
+async function exportAll(){
+  var btn=$('#trExport');btn.disabled=true;trMsg('Preparo il file…');
+  try{
+    var blob=await buildBackup($('#trPhotos').checked);
+    await saveFile('haccp-dati-'+dayKey(Date.now())+'.json',blob);
+    markExported();
+    trMsg('File creato ('+(Math.round(blob.size/104857.6)/10)+' MB). Portalo sull’altro dispositivo e usa “Importa file”.');
+    toast('File salvato.');
+  }catch(e){
+    trMsg(e&&e.code==='declined'?'Salvataggio annullato.':'Non sono riuscito a preparare il file. Riprova, magari senza foto.');
+  }
+  btn.disabled=false;
+}
+function reviveRec(store,r){
+  var c=Object.assign({},r);
+  if(store==='bolle')c.photos=(Array.isArray(c.photos)?c.photos:[]).map(function(p){return typeof p==='string'?dataToBlob(p):p;}).filter(Boolean);
+  if(store==='lotti')c.photo=(typeof c.photo==='string')?dataToBlob(c.photo):null;
+  return c;
+}
+function idSet(list){var o={};list.forEach(function(x){o[x.id]=1;});return o;}
+async function mergeData(d){
+  var D=d.dati,add={},skip={};
+  TR_STORES.forEach(function(k){add[k]=0;skip[k]=0;});
+  function arr(k){return Array.isArray(D[k])?D[k].filter(Boolean):[];}
+  async function mergeByName(store){
+    var have={};(await allOf(store)).forEach(function(x){have[String(x.nome).toLowerCase()]=1;});
+    for(var r of arr(store)){
+      if(!r.nome||!r.id)continue;var k=String(r.nome).toLowerCase();
+      if(have[k]){skip[store]++;continue;}
+      have[k]=1;await stPut(store,r);add[store]++;
+    }
+  }
+  await mergeByName('fornitori');
+  await mergeByName('ricette');
+  var locI=await allOf('ingredienti'),idMap={};
+  for(var r of arr('ingredienti')){
+    if(!r.nome||!r.id)continue;
+    var m=locI.find(function(x){return (r.barcode&&x.barcode&&x.barcode===r.barcode)||String(x.nome).toLowerCase()===String(r.nome).toLowerCase();});
+    if(m){
+      idMap[r.id]=m.id;var ch=false;
+      if(!m.barcode&&r.barcode){m.barcode=r.barcode;ch=true;}
+      if(!m.fornitore&&r.fornitore){m.fornitore=r.fornitore;ch=true;}
+      if(ch)await stPut('ingredienti',m);
+      skip.ingredienti++;
+    }else{await stPut('ingredienti',r);locI.push(r);idMap[r.id]=r.id;add.ingredienti++;}
+  }
+  var haveL=idSet(await allOf('lotti'));
+  for(var l of arr('lotti')){
+    if(!l.id)continue;
+    if(haveL[l.id]){skip.lotti++;continue;}
+    var cl=reviveRec('lotti',l);cl.ingId=idMap[cl.ingId]||cl.ingId;
+    await stPut('lotti',cl);haveL[cl.id]=1;add.lotti++;
+  }
+  var haveB=idSet(await allOf('bolle'));
+  for(var b of arr('bolle')){
+    if(!b.id)continue;
+    if(haveB[b.id]){skip.bolle++;continue;}
+    await dbPut(reviveRec('bolle',b));haveB[b.id]=1;add.bolle++;
+  }
+  return {add:add,skip:skip};
+}
+async function replaceData(d){
+  var D=d.dati,prepared={},add={};
+  TR_STORES.forEach(function(k){prepared[k]=(Array.isArray(D[k])?D[k]:[]).filter(Boolean).map(function(r){return reviveRec(k,r);});});
+  for(var i=0;i<TR_STORES.length;i++)await clearStore(TR_STORES[i]);
+  for(var j=0;j<TR_STORES.length;j++){
+    var k=TR_STORES[j];add[k]=0;
+    for(var r of prepared[k]){await putTo(k,r);add[k]++;}
+  }
+  return {add:add,skip:{}};
+}
+async function reloadAll(){
+  S.rows=(await dbAll()).sort(function(a,b){return b.ts-a.ts;});
+  S.sup=await stAll('fornitori');S.ric=await stAll('ricette');S.ingr=await stAll('ingredienti');S.lotti=await stAll('lotti');
+  lsSet('ricezione.supMigrato',true);
+  renderAll();
+}
+function trSummary(rep){
+  var a=[],s=[];
+  TR_STORES.forEach(function(k){
+    if(rep.add[k])a.push(rep.add[k]+' '+TR_NAMES[k]);
+    if(rep.skip&&rep.skip[k])s.push(rep.skip[k]+' '+TR_NAMES[k]);
+  });
+  return 'Fatto. Aggiunti: '+(a.length?a.join(', '):'niente di nuovo')+'.'+(s.length?' Già presenti, non duplicati: '+s.join(', ')+'.':'');
+}
+async function importFile(file){
+  var mode=document.querySelector('input[name=trMode]:checked').value,d;
+  trMsg('Leggo il file…');
+  try{d=JSON.parse(await file.text());}catch(e){trMsg('Questo file non si legge. Serve un file creato con “Esporta tutto”.');return;}
+  if(!d||d.app!=='haccp-ricezione'||!d.dati||typeof d.dati!=='object'){trMsg('Questo non sembra un file di questa app. Serve un file creato con “Esporta tutto”.');return;}
+  function n(k){return Array.isArray(d.dati[k])?d.dati[k].length:0;}
+  var desc=TR_STORES.map(function(k){return n(k)+' '+TR_NAMES[k];}).join(', ');
+  if(mode==='replace'&&!confirm('Sostituire tutto? I dati di questo dispositivo verranno cancellati e rimpiazzati con quelli del file ('+desc+'). Se non hai una copia dei dati di qui, annulla ed esportali prima.')){trMsg('Importazione annullata. Non è stato cambiato nulla.');return;}
+  $('#trImport').disabled=true;$('#trExport').disabled=true;trMsg('Importo…');
+  try{
+    var rep=await (mode==='replace'?replaceData(d):mergeData(d));
+    await reloadAll();
+    trMsg(trSummary(rep));toast('Importazione completata.');
+  }catch(e){
+    try{await reloadAll();}catch(x){}
+    trMsg('Importazione non riuscita. Controlla lo spazio libero sul dispositivo e riprova.');
+  }
+  $('#trImport').disabled=false;$('#trExport').disabled=false;
+}
+
 /* ---------- dettaglio ---------- */
 function closeViewer(){$('#viewer').hidden=true;revokeAll(S.viewUrls);S.openId=null;}
 function openViewer(id){
@@ -1192,7 +1360,7 @@ function setBusy(on,msg){
 function markExported(){S.lastExport=Date.now();lsSet('ricezione.lastExport',S.lastExport);renderNotices();}
 async function saveFile(filename,data){
   if(S.dl)return S.dl.save({filename:filename,data:data});
-  var type=/\.pdf$/.test(filename)?'application/pdf':'text/csv';
+  var type=/\.pdf$/.test(filename)?'application/pdf':(/\.json$/.test(filename)?'application/json':'text/csv');
   var blob=(data instanceof Blob)?data:new Blob([data],{type:type+';charset=utf-8'});
   var file=new File([blob],filename,{type:type});
   if(navigator.canShare&&navigator.canShare({files:[file]})){
@@ -1265,6 +1433,9 @@ function bind(){
   $('#labCancel').addEventListener('click',closeLabel);
   $('#ingSheet').addEventListener('click',function(e){if(e.target===this)closeIng();});
   $('#btnLotExport').addEventListener('click',exportLotti);
+  $('#trExport').addEventListener('click',exportAll);
+  $('#trImport').addEventListener('click',function(){$('#trFile').click();});
+  $('#trFile').addEventListener('change',function(){var f=this.files&&this.files[0];this.value='';if(f)importFile(f);});
   document.addEventListener('keydown',function(e){if(e.key==='Escape'){if(!$('#viewer').hidden)closeViewer();else if(!$('#exportSheet').hidden)$('#exportSheet').hidden=true;else if(!$('#ingSheet').hidden)closeIng();else if(!$('#labSheet').hidden)closeLabel();else closeCompose();}});
 }
 async function boot(){
