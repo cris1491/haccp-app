@@ -136,6 +136,10 @@ button.card:hover{border-color:var(--accent)}
 .actions .danger{border-color:var(--bad);color:var(--bad)}
 .actions .danger.solid{background:var(--bad);color:var(--surface)}
 .actions button:disabled{opacity:.5;cursor:default}
+input[type=date],input[type=number]{width:100%;min-height:52px;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:1rem}
+input[type=date]:focus,input[type=number]:focus{border-color:var(--accent)}
+.lines{margin:0 0 4px}.lines .item-sub{margin-top:-2px}.lwarn{color:var(--bad);font-weight:600}
+#lavNew{width:100%;margin:4px 0 14px}#btnLavExport{margin-top:14px}
 select{width:100%;min-height:52px;padding:0 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg);font-size:1rem}
 .info{color:var(--muted);margin:0 0 14px}
 .stack{display:flex;flex-direction:column;gap:10px}
@@ -298,6 +302,14 @@ input[type=date]{display:block;width:100%;min-height:52px;padding:10px 12px;bord
     </section>
   </main>
 
+  <section class="page" id="sec-lavorazioni" data-page hidden aria-label="Lavorazioni">
+    <h2 class="list-title">Lavorazioni<span class="mono" id="lavCount"></span></h2>
+    <p class="info">Registra ogni preparazione: scegli la ricetta e il lotto di ogni ingrediente usato. L'app crea il lotto interno e calcola la scadenza.</p>
+    <button class="addbtn" type="button" id="lavNew">+ Nuova lavorazione</button>
+    <div id="lavList"></div>
+    <button type="button" class="ghost" id="btnLavExport">Esporta lavorazioni (CSV)</button>
+  </section>
+
   <section class="page" id="sec-fornitori" data-page hidden aria-label="Fornitori">
     <h2 class="list-title">Fornitori<span class="mono" id="supCount"></span></h2>
     <form class="addrow" id="supForm" novalidate>
@@ -312,6 +324,7 @@ input[type=date]{display:block;width:100%;min-height:52px;padding:10px 12px;bord
     <h2 class="list-title">Ricette<span class="mono" id="ricCount"></span></h2>
     <form class="addcol" id="ricForm" novalidate>
       <input id="ricName" type="text" autocomplete="off" autocapitalize="sentences" placeholder="Nome della ricetta" aria-label="Nome della ricetta">
+      <input id="ricDays" type="number" inputmode="numeric" min="0" max="3650" placeholder="Scadenza standard in giorni (es. 3)" aria-label="Scadenza standard in giorni">
       <textarea id="ricIng" rows="4" placeholder="Ingredienti, uno per riga" aria-label="Ingredienti, uno per riga"></textarea>
       <button class="addbtn" type="submit">Aggiungi ricetta</button>
     </form>
@@ -358,7 +371,7 @@ input[type=date]{display:block;width:100%;min-height:52px;padding:10px 12px;bord
 
   <section class="page" id="sec-soon" data-page hidden aria-label="Sezione in preparazione">
     <h2 class="list-title" id="soonTitle"></h2>
-    <p class="empty-s">Questa sezione è in preparazione. Per ora sono attive Ricezione merce, Fornitori e Ricette.</p>
+    <p class="empty-s">Questa sezione è in preparazione. Per ora sono attive Ricezione merce, Ingredienti, Lavorazioni, Ricette, Fornitori e Trasferimento.</p>
   </section>
 </div>
 
@@ -443,6 +456,41 @@ input[type=date]{display:block;width:100%;min-height:52px;padding:10px 12px;bord
   </div>
 </div>
 
+<div class="overlay" id="lavSheet" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lavTitle">
+    <h2 id="lavTitle">Nuova lavorazione</h2>
+    <p class="sub">Scegli la ricetta e il lotto di ogni ingrediente usato.</p>
+    <form id="lavForm" novalidate>
+      <div class="field"><label class="lbl" for="lavRic">Ricetta</label><select id="lavRic"></select></div>
+      <div class="field"><label class="lbl" for="lavDate">Data di produzione</label><input id="lavDate" type="date"></div>
+      <div class="lines" id="lavLines"></div>
+      <div class="row2">
+        <div class="field"><label class="lbl" for="lavDays">Giorni di scadenza</label><input id="lavDays" type="number" inputmode="numeric" min="0" max="3650"></div>
+        <div class="field"><label class="lbl" for="lavScad">Scadenza</label><input id="lavScad" type="date"></div>
+      </div>
+      <p class="hint lwarn" id="lavWarn" hidden></p>
+      <div class="field"><label class="lbl" for="lavLot">Lotto interno</label><input id="lavLot" type="text" autocomplete="off" autocapitalize="characters"></div>
+      <div class="field"><label class="lbl" for="lavNote">Note (facoltativo)</label><input id="lavNote" type="text" autocomplete="off"></div>
+      <p class="err" id="lavErr" role="alert" hidden></p>
+      <div class="actions">
+        <button type="button" id="lavCancel">Annulla</button>
+        <button type="submit" class="solid">Salva lavorazione</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="overlay" id="lavView" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="lavViewTitle">
+    <h2 id="lavViewTitle"></h2>
+    <p class="sub" id="lavViewSub"></p>
+    <dl class="kv" id="lavViewKv"></dl>
+    <div id="lavViewComps"></div>
+    <div id="lavViewUsed"></div>
+    <div class="actions" id="lavViewActions" style="margin-top:14px"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -464,14 +512,14 @@ function h(tag,attrs){
 function lsGet(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 
-var S={db:null,dbBlocked:false,mem:[],sup:[],ric:[],ingr:[],lotti:[],memS:{},sec:'ricezione',confirmDel:null,rows:[],draft:[],urls:[],viewUrls:[],openId:null,dl:null,standalone:!(window.claude&&window.claude.use),lastExport:lsGet('ricezione.lastExport')};
+var S={db:null,dbBlocked:false,mem:[],sup:[],ric:[],ingr:[],lotti:[],lav:[],memS:{},sec:'ricezione',confirmDel:null,rows:[],draft:[],urls:[],viewUrls:[],openId:null,dl:null,standalone:!(window.claude&&window.claude.use),lastExport:lsGet('ricezione.lastExport')};
 
 /* ---------- archivio locale (IndexedDB) ----------
    Tre archivi gia' pronti: bolle (in uso), ingredienti e ricette (per la tracciabilita' futura). */
 function idbOpen(){
   return new Promise(function(res,rej){
     var rq;
-    try{rq=indexedDB.open('haccp-ricezione',3);}catch(e){rej(e);return;}
+    try{rq=indexedDB.open('haccp-ricezione',4);}catch(e){rej(e);return;}
     rq.onupgradeneeded=function(){
       var d=rq.result;
       if(!d.objectStoreNames.contains('bolle')){d.createObjectStore('bolle',{keyPath:'id'}).createIndex('ts','ts');}
@@ -479,6 +527,7 @@ function idbOpen(){
       if(!d.objectStoreNames.contains('ricette')){d.createObjectStore('ricette',{keyPath:'id'});}
       if(!d.objectStoreNames.contains('fornitori')){d.createObjectStore('fornitori',{keyPath:'id'});}
       if(!d.objectStoreNames.contains('lotti')){d.createObjectStore('lotti',{keyPath:'id'});}
+      if(!d.objectStoreNames.contains('lavorazioni')){d.createObjectStore('lavorazioni',{keyPath:'id'});}
     };
     rq.onsuccess=function(){var d=rq.result;d.onversionchange=function(){d.close();};res(d);};
     rq.onerror=function(){rej(rq.error);};
@@ -659,8 +708,8 @@ function renderNotices(){
 function renderAll(){renderList();renderSuppliers();renderNotices();refreshLists();renderIngList();renderTrInfo();}
 
 /* ---------- sezioni, fornitori, ricette ---------- */
-var SECS={ricezione:'Ricezione merce',ingredienti:'Ingredienti',temperature:'Temperature frigo',lavorazioni:'Lavorazioni',etichette:'Etichette',storico:'Storico',ricette:'Ricette',fornitori:'Fornitori',trasferimento:'Trasferimento'};
-var ACTIVE={ricezione:1,ingredienti:1,ricette:1,fornitori:1,trasferimento:1};
+var SECS={ricezione:'Ricezione merce',lavorazioni:'Lavorazioni',etichette:'Etichette',ingredienti:'Ingredienti',ricette:'Ricette',temperature:'Temperature frigo',storico:'Storico',fornitori:'Fornitori',trasferimento:'Trasferimento'};
+var ACTIVE={ricezione:1,ingredienti:1,lavorazioni:1,ricette:1,fornitori:1,trasferimento:1};
 function buildTabs(){
   var nav=$('#tabs');nav.textContent='';
   Object.keys(SECS).forEach(function(k){
@@ -679,7 +728,7 @@ function showSection(k){
   refreshLists();renderTrInfo();
   window.scrollTo(0,0);
 }
-function refreshLists(){renderSupList();renderRicList();}
+function refreshLists(){renderSupList();renderRicList();renderLavList();}
 function pitem(id,name,sub,onDel){
   var acts=S.confirmDel===id
     ?h('span',{class:'item-actions'},
@@ -723,7 +772,7 @@ function renderRicList(){
   var items=S.ric.slice().sort(byName);
   $('#ricCount').textContent=items.length?items.length+(items.length===1?' ricetta':' ricette'):'';
   if(!items.length){box.append(h('p',{class:'empty-s',text:'Ancora nessuna ricetta. Aggiungine una qui sopra.'}));return;}
-  items.forEach(function(r){box.append(pitem(r.id,r.nome,(r.ingredienti||[]).join(' · '),function(){delRic(r.id);}));});
+  items.forEach(function(r){box.append(pitem(r.id,r.nome,(r.giorni!=null?'Scadenza: '+r.giorni+(r.giorni===1?' giorno':' giorni')+' · ':'')+(r.ingredienti||[]).join(' · '),function(){delRic(r.id);}));});
 }
 function onRicAdd(e){
   e.preventDefault();$('#ricErr').hidden=true;
@@ -732,8 +781,10 @@ function onRicAdd(e){
   if(!n){showFormErr('ricErr','Scrivi il nome della ricetta.');nm.focus();return;}
   if(!ings.length){showFormErr('ricErr','Scrivi almeno un ingrediente, uno per riga.');ig.focus();return;}
   if(S.ric.some(function(r){return r.nome.toLowerCase()===n.toLowerCase();})){showFormErr('ricErr','Esiste già una ricetta con questo nome.');return;}
-  var rec={id:uid(),nome:n,ingredienti:ings};
-  stPut('ricette',rec).then(function(){S.ric.push(rec);nm.value='';ig.value='';refreshLists();toast('Ricetta aggiunta.');})
+  var dv=$('#ricDays').value.trim(),gg=dv===''?null:Math.round(+dv);
+  if(gg!=null&&(!(gg>=0)||gg>3650)){showFormErr('ricErr','I giorni di scadenza devono essere un numero, ad esempio 3.');$('#ricDays').focus();return;}
+  var rec={id:uid(),nome:n,ingredienti:ings,giorni:gg};
+  stPut('ricette',rec).then(function(){S.ric.push(rec);nm.value='';ig.value='';$('#ricDays').value='';refreshLists();toast('Ricetta aggiunta.');})
   .catch(function(){showFormErr('ricErr','Salvataggio non riuscito. Riprova.');});
 }
 function delRic(id){
@@ -1104,9 +1155,203 @@ async function exportLotti(){
   }catch(e){toast(e&&e.code==='declined'?'Salvataggio annullato.':'Non sono riuscito a preparare il file. Riprova.');}
 }
 
+/* ---------- lavorazioni ---------- */
+var LAV={lines:[],scadManual:false,lotManual:false,view:null,confirm:false};
+function isoToday(){return dayKey(Date.now());}
+function addDaysIso(iso,n){var d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+function lavById(id){return S.lav.find(function(l){return l.id===id;})||null;}
+function nameMatch(a,b){a=String(a||'').toLowerCase().trim();b=String(b||'').toLowerCase().trim();return !!a&&!!b&&(a===b||a.indexOf(b)>=0||b.indexOf(a)>=0);}
+function nextLotto(iso){
+  var base='LAV-'+iso.slice(2,4)+iso.slice(5,7)+iso.slice(8,10),n=1;
+  while(S.lav.some(function(l){return String(l.lotto).toLowerCase()===(base+'-'+p2(n)).toLowerCase();}))n++;
+  return base+'-'+p2(n);
+}
+function lavSort(a,b){return (b.prod||'').localeCompare(a.prod||'')||(b.ts-a.ts);}
+function renderLavList(){
+  var box=$('#lavList');if(!box)return;box.textContent='';
+  var items=S.lav.slice().sort(lavSort);
+  $('#lavCount').textContent=items.length?items.length+(items.length===1?' lavorazione':' lavorazioni'):'';
+  if(!items.length){box.append(h('p',{class:'empty-s',text:'Ancora nessuna lavorazione. Tocca “Nuova lavorazione” per registrare la prima.'}));return;}
+  var grid=h('div',{class:'cards'});
+  items.forEach(function(l){
+    grid.append(h('button',{class:'card',type:'button','aria-label':'Apri '+l.nome,onclick:function(){openLavView(l.id);}},
+      h('span',{class:'card-body'},
+        h('span',{class:'card-sup',text:l.nome}),
+        h('span',{class:'card-meta',text:'Lotto '+l.lotto+'  ·  prodotta il '+fmtIso(l.prod)}),
+        h('span',{class:'chips'},scadChip(l.scad)))));
+  });
+  box.append(grid);
+}
+function candidatesFor(line){
+  var mine=[],others=[];
+  S.ingr.forEach(function(g){lotsOf(g.id).forEach(function(l){(nameMatch(g.nome,line)?mine:others).push({g:g,l:l});});});
+  function byScad(a,b){return (a.l.scad||'9999').localeCompare(b.l.scad||'9999');}
+  mine.sort(byScad);others.sort(function(a,b){return a.g.nome.localeCompare(b.g.nome,'it')||byScad(a,b);});
+  var preps=S.lav.filter(function(p){return nameMatch(p.nome,line);}).sort(lavSort);
+  return {mine:mine,others:others,preps:preps};
+}
+function lotText(c){return c.g.nome+' · lotto '+c.l.lotto+(c.l.scad?' · scad. '+fmtIso(c.l.scad):'');}
+function prepText(p){return p.nome+' · lotto interno '+p.lotto+' · scad. '+fmtIso(p.scad);}
+function buildLine(line,date){
+  var c=candidatesFor(line),sel=h('select',{'aria-label':'Lotto di '+line});
+  sel.append(h('option',{value:'',text:'— scegli il lotto —'}));
+  if(c.mine.length){var g1=h('optgroup',{label:'Lotti di questo ingrediente'});c.mine.forEach(function(x){g1.append(h('option',{value:'L:'+x.l.id,text:lotText(x)}));});sel.append(g1);}
+  if(c.preps.length){var g2=h('optgroup',{label:'Preparazioni interne'});c.preps.forEach(function(p){g2.append(h('option',{value:'P:'+p.id,text:prepText(p)}));});sel.append(g2);}
+  if(c.others.length){var g3=h('optgroup',{label:'Altri ingredienti registrati'});c.others.forEach(function(x){g3.append(h('option',{value:'L:'+x.l.id,text:lotText(x)}));});sel.append(g3);}
+  sel.append(h('option',{value:'N',text:'Senza lotto (es. acqua, sale)'}));
+  var pick='';
+  var okMine=c.mine.filter(function(x){return !x.l.scad||x.l.scad>=date;})[0];
+  var okPrep=c.preps.filter(function(p){return !p.scad||p.scad>=date;})[0];
+  if(okMine)pick='L:'+okMine.l.id;else if(okPrep)pick='P:'+okPrep.id;
+  sel.value=pick;
+  var hint=h('p',{class:'hint',hidden:true});
+  var fld=h('div',{class:'field','data-flag':pick?'check':'missing'},h('label',{class:'lbl',text:line}),sel,hint);
+  return {line:line,sel:sel,fld:fld,hint:hint};
+}
+function lineRef(v){
+  if(!v||v==='N')return v==='N'?{tipo:'nessuno'}:null;
+  var id=v.slice(2);
+  if(v.charAt(0)==='L'){var l=S.lotti.find(function(x){return x.id===id;});if(!l)return null;var g=ingById(l.ingId)||{};return {tipo:'lotto',ingId:l.ingId,nome:g.nome||'',lotId:l.id,lotto:l.lotto,scad:l.scad||''};}
+  if(v.charAt(0)==='P'){var p=lavById(id);if(!p)return null;return {tipo:'prep',nome:p.nome,lavId:p.id,lotto:p.lotto,scad:p.scad||''};}
+  return null;
+}
+function updateLav(){
+  var date=$('#lavDate').value||isoToday(),dv=$('#lavDays').value.trim();
+  if(!LAV.scadManual)$('#lavScad').value=(dv!==''&&+dv>=0)?addDaysIso(date,Math.round(+dv)):'';
+  if(!LAV.lotManual)$('#lavLot').value=nextLotto(date);
+  var scad=$('#lavScad').value,minS='';
+  LAV.lines.forEach(function(L){
+    var r=lineRef(L.sel.value),msg='';
+    if(r&&r.scad){
+      if(r.scad<date)msg='Attenzione: questo lotto era già scaduto il '+fmtIso(r.scad)+'.';
+      if(!minS||r.scad<minS)minS=r.scad;
+    }
+    L.hint.textContent=msg;L.hint.hidden=!msg;L.hint.className='hint'+(msg?' lwarn':'');
+  });
+  var w=$('#lavWarn');
+  if(scad&&minS&&minS<scad){w.textContent='Attenzione: un ingrediente scade il '+fmtIso(minS)+', prima della scadenza calcolata ('+fmtIso(scad)+'). Controlla.';w.hidden=false;}
+  else w.hidden=true;
+}
+function buildLavLines(){
+  var box=$('#lavLines');box.textContent='';LAV.lines=[];
+  var rc=S.ric.find(function(r){return r.id===$('#lavRic').value;});
+  if(!rc)return;
+  var date=$('#lavDate').value||isoToday();
+  (rc.ingredienti||[]).forEach(function(line){var L=buildLine(line,date);LAV.lines.push(L);box.append(L.fld);});
+  $('#lavDays').value=rc.giorni!=null?rc.giorni:'';
+  LAV.scadManual=false;
+}
+function openLavForm(){
+  if(!S.ric.length){toast('Prima crea almeno una ricetta nella sezione Ricette.');return;}
+  var s=$('#lavRic');s.textContent='';
+  s.append(h('option',{value:'',text:'— scegli la ricetta —'}));
+  S.ric.slice().sort(byName).forEach(function(r){s.append(h('option',{value:r.id,text:r.nome}));});
+  $('#lavDate').value=isoToday();$('#lavDays').value='';$('#lavScad').value='';$('#lavNote').value='';
+  $('#lavLines').textContent='';LAV.lines=[];LAV.scadManual=false;LAV.lotManual=false;
+  $('#lavErr').hidden=true;$('#lavWarn').hidden=true;
+  $('#lavLot').value=nextLotto(isoToday());
+  $('#lavSheet').hidden=false;$('#lavSheet .panel').scrollTop=0;
+}
+function closeLav(){$('#lavSheet').hidden=true;}
+function onLavInput(e){
+  var id=e.target.id;
+  if(id==='lavRic'){buildLavLines();}
+  else if(id==='lavScad'){LAV.scadManual=true;}
+  else if(id==='lavDays'){LAV.scadManual=false;}
+  else if(id==='lavLot'){LAV.lotManual=true;}
+  else if(e.target.tagName==='SELECT'){var f=e.target.closest('.field');if(f)f.removeAttribute('data-flag');}
+  updateLav();
+}
+async function onLavSave(e){
+  e.preventDefault();
+  var err=$('#lavErr');err.hidden=true;
+  function bad(m,el){err.textContent=m;err.hidden=false;if(el&&el.focus)el.focus();}
+  var rc=S.ric.find(function(r){return r.id===$('#lavRic').value;});
+  if(!rc){bad('Scegli la ricetta.',$('#lavRic'));return;}
+  var date=$('#lavDate').value;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){bad('Indica la data di produzione.',$('#lavDate'));return;}
+  var comps=[];
+  for(var i=0;i<LAV.lines.length;i++){
+    var L=LAV.lines[i],r=lineRef(L.sel.value);
+    if(!r){bad('Scegli il lotto di «'+L.line+'», oppure “Senza lotto”.',L.sel);return;}
+    r.riga=L.line;comps.push(r);
+  }
+  var scad=$('#lavScad').value;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(scad)){bad('Indica i giorni di scadenza oppure la data di scadenza.',$('#lavDays'));return;}
+  if(scad<date){bad('La scadenza non può essere prima della produzione.',$('#lavScad'));return;}
+  var lot=$('#lavLot').value.trim();
+  if(!lot){bad('Scrivi il lotto interno.',$('#lavLot'));return;}
+  if(S.lav.some(function(l){return String(l.lotto).toLowerCase()===lot.toLowerCase();})){bad('Esiste già una lavorazione con il lotto «'+lot+'». Cambialo.',$('#lavLot'));return;}
+  var scaduti=comps.filter(function(c){return c.scad&&c.scad<date;});
+  if(scaduti.length&&!confirm('Attenzione: '+scaduti.map(function(c){return c.riga;}).join(', ')+' ha un lotto già scaduto alla data di produzione. Salvare comunque?'))return;
+  var dv=$('#lavDays').value.trim(),giorni=dv===''?null:Math.round(+dv);
+  var rec={id:uid(),ts:Date.now(),prod:date,ricId:rc.id,nome:rc.nome,lotto:lot,scad:scad,giorni:giorni,note:$('#lavNote').value.trim(),comps:comps};
+  try{
+    await stPut('lavorazioni',rec);S.lav.push(rec);
+    if(rc.giorni==null&&giorni!=null&&giorni>=0){rc.giorni=giorni;await stPut('ricette',rc);}
+  }catch(x){bad('Salvataggio non riuscito. Riprova.');return;}
+  closeLav();renderLavList();refreshLists();
+  toast('Lavorazione salvata · lotto '+lot+' · scad. '+fmtIso(scad)+'.');
+}
+function openLavView(id){LAV.view=id;LAV.confirm=false;renderLavView();$('#lavView').hidden=false;}
+function closeLavView(){$('#lavView').hidden=true;LAV.view=null;}
+function usedIn(id){return S.lav.filter(function(x){return (x.comps||[]).some(function(c){return c.lavId===id;});}).sort(lavSort);}
+function renderLavView(){
+  var l=lavById(LAV.view);if(!l){closeLavView();return;}
+  $('#lavViewTitle').textContent=l.nome;
+  $('#lavViewSub').textContent='Registrata il '+fmtDateTime(l.ts);
+  var kv=$('#lavViewKv');kv.textContent='';
+  kv.append(h('dt',{text:'Lotto interno'}),h('dd',{class:'mono',text:l.lotto}),
+            h('dt',{text:'Prodotta il'}),h('dd',{text:fmtIso(l.prod)}),
+            h('dt',{text:'Scadenza'}),h('dd',{text:fmtIso(l.scad)}));
+  if(l.note)kv.append(h('dt',{text:'Note'}),h('dd',{text:l.note}));
+  var box=$('#lavViewComps');box.textContent='';
+  box.append(h('p',{class:'lbl',text:'Ingredienti usati'}));
+  (l.comps||[]).forEach(function(c){
+    var det=c.tipo==='nessuno'?'Senza lotto':(c.tipo==='prep'?'Preparazione interna · lotto ':'Lotto ')+c.lotto+(c.scad?' · scad. '+fmtIso(c.scad):'');
+    var nm=c.riga+(c.nome&&c.nome.toLowerCase()!==String(c.riga).toLowerCase()?' → '+c.nome:'');
+    box.append(h('div',{class:'lotrow'},h('span',{class:'lotinfo'},h('b',{text:nm}),h('span',{class:'card-meta',text:det}))));
+  });
+  var u=usedIn(l.id),ub=$('#lavViewUsed');ub.textContent='';
+  if(u.length){
+    ub.append(h('p',{class:'lbl',style:'margin-top:14px',text:'Usata in'}));
+    u.forEach(function(x){ub.append(h('div',{class:'lotrow'},h('span',{class:'lotinfo'},h('b',{text:x.nome}),h('span',{class:'card-meta',text:'Lotto '+x.lotto+' · prodotta il '+fmtIso(x.prod)}))));});
+  }
+  var a=$('#lavViewActions');a.textContent='';
+  if(LAV.confirm){
+    if(u.length)a.append(h('p',{class:'err',style:'flex:1 1 100%;margin:0',text:'Questa lavorazione risulta usata in altre preparazioni: eliminandola si perde il collegamento.'}));
+    a.append(h('button',{type:'button',text:'Annulla',onclick:function(){LAV.confirm=false;renderLavView();}}),
+             h('button',{type:'button',class:'danger solid',text:'Conferma: elimina',onclick:delLav}));
+  }else{
+    a.append(h('button',{type:'button',class:'danger',text:'Elimina',onclick:function(){LAV.confirm=true;renderLavView();}}),
+             h('button',{type:'button',class:'solid',text:'Chiudi',onclick:closeLavView}));
+  }
+}
+function delLav(){
+  var id=LAV.view;
+  stDel('lavorazioni',id).then(function(){
+    S.lav=S.lav.filter(function(x){return x.id!==id;});closeLavView();renderLavList();toast('Lavorazione eliminata.');
+  }).catch(function(){toast('Eliminazione non riuscita. Riprova.');});
+}
+function buildLavCsv(){
+  var out=[['Data produzione','Ricetta','Lotto interno','Scadenza','Ingrediente (da ricetta)','Prodotto','Tipo','Lotto ingrediente','Scadenza ingrediente','Note']];
+  S.lav.slice().sort(function(a,b){return lavSort(b,a);}).forEach(function(l){
+    var cs=(l.comps&&l.comps.length)?l.comps:[{}];
+    cs.forEach(function(c){
+      out.push([fmtIso(l.prod),l.nome,l.lotto,fmtIso(l.scad),c.riga||'',c.nome||'',c.tipo==='prep'?'preparazione interna':(c.tipo==='nessuno'?'senza lotto':(c.tipo?'ingrediente':'')),c.lotto||'',c.scad?fmtIso(c.scad):'',l.note||'']);
+    });
+  });
+  return '﻿'+out.map(function(r){return r.map(csvCell).join(';');}).join('\r\n');
+}
+async function exportLav(){
+  if(!S.lav.length){toast('Non ci sono ancora lavorazioni da esportare.');return;}
+  try{await saveFile('lavorazioni-'+dayKey(Date.now())+'.csv',buildLavCsv());toast('File salvato. Ora allegalo a una mail.');}
+  catch(e){toast(e&&e.code==='declined'?'Salvataggio annullato.':'Non sono riuscito a preparare il file. Riprova.');}
+}
+
 /* ---------- trasferimento dei dati tra dispositivi ---------- */
-var TR_STORES=['bolle','fornitori','ricette','ingredienti','lotti'];
-var TR_NAMES={bolle:'ricezioni',fornitori:'fornitori',ricette:'ricette',ingredienti:'ingredienti',lotti:'lotti'};
+var TR_STORES=['bolle','fornitori','ricette','ingredienti','lotti','lavorazioni'];
+var TR_NAMES={bolle:'ricezioni',fornitori:'fornitori',ricette:'ricette',ingredienti:'ingredienti',lotti:'lotti',lavorazioni:'lavorazioni'};
 function allOf(store){return store==='bolle'?dbAll():stAll(store);}
 function putTo(store,rec){return store==='bolle'?dbPut(rec):stPut(store,rec);}
 function clearStore(store){
@@ -1116,7 +1361,7 @@ function clearStore(store){
 }
 function renderTrInfo(){
   var el=$('#trCounts');if(!el)return;
-  el.textContent=S.rows.length+' ricezioni · '+S.sup.length+' fornitori · '+S.ric.length+' ricette · '+S.ingr.length+' ingredienti · '+S.lotti.length+' lotti';
+  el.textContent=S.rows.length+' ricezioni · '+S.sup.length+' fornitori · '+S.ric.length+' ricette · '+S.ingr.length+' ingredienti · '+S.lotti.length+' lotti · '+S.lav.length+' lavorazioni';
 }
 function trMsg(m){$('#trMsg').textContent=m;}
 function dataToBlob(u){
@@ -1168,11 +1413,11 @@ async function mergeData(d){
   TR_STORES.forEach(function(k){add[k]=0;skip[k]=0;});
   function arr(k){return Array.isArray(D[k])?D[k].filter(Boolean):[];}
   async function mergeByName(store){
-    var have={};(await allOf(store)).forEach(function(x){have[String(x.nome).toLowerCase()]=1;});
+    var have={};(await allOf(store)).forEach(function(x){have[String(x.nome).toLowerCase()]=x;});
     for(var r of arr(store)){
       if(!r.nome||!r.id)continue;var k=String(r.nome).toLowerCase();
-      if(have[k]){skip[store]++;continue;}
-      have[k]=1;await stPut(store,r);add[store]++;
+      if(have[k]){skip[store]++;if(store==='ricette'&&have[k].giorni==null&&r.giorni!=null){have[k].giorni=r.giorni;await stPut(store,have[k]);}continue;}
+      have[k]=r;await stPut(store,r);add[store]++;
     }
   }
   await mergeByName('fornitori');
@@ -1196,6 +1441,14 @@ async function mergeData(d){
     var cl=reviveRec('lotti',l);cl.ingId=idMap[cl.ingId]||cl.ingId;
     await stPut('lotti',cl);haveL[cl.id]=1;add.lotti++;
   }
+  var haveV=idSet(await allOf('lavorazioni'));
+  for(var v of arr('lavorazioni')){
+    if(!v.id)continue;
+    if(haveV[v.id]){skip.lavorazioni++;continue;}
+    var cv=Object.assign({},v);
+    cv.comps=(Array.isArray(cv.comps)?cv.comps:[]).map(function(c){var o=Object.assign({},c);if(o.ingId)o.ingId=idMap[o.ingId]||o.ingId;return o;});
+    await stPut('lavorazioni',cv);haveV[cv.id]=1;add.lavorazioni++;
+  }
   var haveB=idSet(await allOf('bolle'));
   for(var b of arr('bolle')){
     if(!b.id)continue;
@@ -1216,7 +1469,7 @@ async function replaceData(d){
 }
 async function reloadAll(){
   S.rows=(await dbAll()).sort(function(a,b){return b.ts-a.ts;});
-  S.sup=await stAll('fornitori');S.ric=await stAll('ricette');S.ingr=await stAll('ingredienti');S.lotti=await stAll('lotti');
+  S.sup=await stAll('fornitori');S.ric=await stAll('ricette');S.ingr=await stAll('ingredienti');S.lotti=await stAll('lotti');S.lav=await stAll('lavorazioni');
   lsSet('ricezione.supMigrato',true);
   renderAll();
 }
@@ -1442,10 +1695,17 @@ function bind(){
   $('#labCancel').addEventListener('click',closeLabel);
   $('#ingSheet').addEventListener('click',function(e){if(e.target===this)closeIng();});
   $('#btnLotExport').addEventListener('click',exportLotti);
+  $('#lavNew').addEventListener('click',openLavForm);
+  $('#lavCancel').addEventListener('click',closeLav);
+  $('#lavForm').addEventListener('change',onLavInput);
+  $('#lavForm').addEventListener('input',function(e){if(e.target.tagName!=='SELECT')onLavInput(e);});
+  $('#lavForm').addEventListener('submit',onLavSave);
+  $('#lavView').addEventListener('click',function(e){if(e.target===this)closeLavView();});
+  $('#btnLavExport').addEventListener('click',exportLav);
   $('#trExport').addEventListener('click',exportAll);
   $('#trImport').addEventListener('click',function(){$('#trFile').click();});
   $('#trFile').addEventListener('change',function(){var f=this.files&&this.files[0];this.value='';if(f)importFile(f);});
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'){if(!$('#viewer').hidden)closeViewer();else if(!$('#exportSheet').hidden)$('#exportSheet').hidden=true;else if(!$('#ingSheet').hidden)closeIng();else if(!$('#labSheet').hidden)closeLabel();else closeCompose();}});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){if(!$('#lavView').hidden){closeLavView();return;}if(!$('#lavSheet').hidden){closeLav();return;}if(!$('#viewer').hidden)closeViewer();else if(!$('#exportSheet').hidden)$('#exportSheet').hidden=true;else if(!$('#ingSheet').hidden)closeIng();else if(!$('#labSheet').hidden)closeLabel();else closeCompose();}});
 }
 async function boot(){
   bind();
@@ -1457,6 +1717,7 @@ async function boot(){
   try{S.ric=await stAll('ricette');}catch(e){S.ric=[];}
   try{S.ingr=await stAll('ingredienti');}catch(e){S.ingr=[];}
   try{S.lotti=await stAll('lotti');}catch(e){S.lotti=[];}
+  try{S.lav=await stAll('lavorazioni');}catch(e){S.lav=[];}
   try{await migrateSuppliers();}catch(e){}
   buildTabs();
   renderAll();
